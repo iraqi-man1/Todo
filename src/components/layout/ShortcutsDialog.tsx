@@ -10,6 +10,7 @@ export function ShortcutsDialog() {
     [['1', '–', '5'], d.shortcuts.nav],
     [['N'], d.shortcuts.newTask],
     [['/'], d.shortcuts.search],
+    [['F'], d.shortcuts.focus],
     [['+', '−'], d.shortcuts.zoom],
     [['0'], d.shortcuts.reset],
     [['←', '↑', '→', '↓'], d.shortcuts.pan],

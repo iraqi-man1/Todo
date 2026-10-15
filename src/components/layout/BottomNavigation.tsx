@@ -10,6 +10,7 @@ export function BottomNavigation() {
   const navigate = useUI((s) => s.navigate)
   return (
     <nav
+      data-dim
       aria-label={d.nav.main}
       className="fixed inset-x-0 bottom-0 z-40 border-t border-line/80 bg-surface/90 pb-[var(--safe-bottom)] backdrop-blur-xl md:hidden"
     >

@@ -20,7 +20,7 @@ export function Board({ children, className, padding }: { children: React.ReactN
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              'radial-gradient(ellipse 80% 60% at 22% 8%, rgb(255 236 200 / 0.24), transparent 65%), radial-gradient(ellipse at 50% 50%, transparent 55%, rgb(30 15 5 / 0.28) 100%)',
+              'radial-gradient(ellipse 70% 55% at 20% 4%, rgb(255 200 130 / calc(var(--lamp, 0) * 0.32)), transparent 70%), radial-gradient(ellipse 80% 60% at 22% 8%, rgb(255 236 200 / 0.22), transparent 65%), radial-gradient(ellipse at 50% 50%, transparent 50%, rgb(20 10 4 / calc(0.28 + var(--lamp, 0) * 0.25)) 100%)',
           }}
         />
         <div className="relative">{children}</div>

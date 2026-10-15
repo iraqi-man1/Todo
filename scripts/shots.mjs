@@ -73,6 +73,21 @@ const runs = [
   ['d', desktop, all, {}],
 ]
 for (const [n, v, s, o] of runs) if (!which || which.includes(n)) await shoot(n, v, s, o)
+if (process.env.FOCUS) {
+  const addNote = async (p) => {
+    await p.evaluate(async () => {
+      const a = await import('/src/domain/actions.ts')
+      const { toKey } = await import('/src/lib/dates.ts')
+      const n = await a.addNote(toKey(new Date()), 'pink', 'Evening')
+      await a.addTask(toKey(new Date()), { title: 'Tidy the desk' }, { noteId: n.id })
+      await a.addTask(toKey(new Date()), { title: 'Make tea' }, { noteId: n.id })
+    })
+    await p.reload()
+    await p.waitForTimeout(1500)
+  }
+  await shoot('d-focus', desktop, [['today', 'today', addNote], ['settings', 'settings']], { prefs: { focusMode: true } })
+  await shoot('m-focus', mobile, [['today', 'today']], { prefs: { focusMode: true } })
+}
 if (process.env.EXTRA) {
   await shoot('d-dark', desktop, [['wall', 'wall'], ['today', 'today']], { dark: true, prefs: { theme: 'dark' } })
   await shoot('m-ar', mobile, [['today', 'today'], ['wall', 'wall']], { prefs: { language: 'ar' } })

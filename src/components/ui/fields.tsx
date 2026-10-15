@@ -83,7 +83,7 @@ export function Segmented<T extends string>({
             className={cn(
               'flex-1 rounded-lg px-3 font-medium whitespace-nowrap transition-all',
               size === 'sm' ? 'h-8 text-[13px]' : 'h-9 text-sm',
-              active ? 'bg-surface text-ink shadow-[0_1px_3px_rgb(64_42_20/0.12)]' : 'text-ink-soft hover:text-ink',
+              active ? 'bg-surface text-ink shadow-[0_1px_3px_rgb(64_42_20/0.12)] dark:bg-white/12 dark:shadow-none' : 'text-ink-soft hover:text-ink',
             )}
           >
             {o.label}

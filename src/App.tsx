@@ -7,6 +7,7 @@ import { loadPrefs } from '@/domain/actions'
 import { useAchievementWatcher } from '@/hooks/useAchievementWatcher'
 import { useMotionLevel } from '@/hooks/useMotionLevel'
 import { useReminders } from '@/hooks/useReminders'
+import { useAmbientSound } from '@/hooks/useAmbientSound'
 import { WOOD_PALETTES, paperNoise, woodTexture } from '@/lib/textures'
 import { usePrefs } from '@/store/prefs'
 
@@ -27,17 +28,22 @@ function useDocumentPrefs() {
   const prefs = usePrefs((s) => s.prefs)
   const systemDark = useSystemDark()
   const level = useMotionLevel()
-  const dark = prefs.theme === 'dark' || (prefs.theme === 'system' && systemDark)
+  const night = prefs.theme === 'night'
+  const dark = night || prefs.theme === 'dark' || (prefs.theme === 'system' && systemDark)
 
   useEffect(() => {
     const root = document.documentElement
     root.classList.toggle('dark', dark)
+    root.classList.toggle('night', night)
+    root.style.setProperty('--lamp', night ? String(prefs.lamp) : '0')
+    root.classList.toggle('focus-mode', prefs.focusMode)
+    root.classList.toggle('still', !prefs.ambient || prefs.focusMode)
     root.lang = prefs.language
     root.dir = prefs.language === 'ar' ? 'rtl' : 'ltr'
     root.classList.toggle('motion-off', level === 'off')
     root.classList.toggle('motion-reduced', level === 'reduced')
-    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', dark ? '#1C1814' : '#F8F5EF'))
-  }, [dark, prefs.language, level])
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', night ? '#101827' : dark ? '#1C1814' : '#F8F5EF'))
+  }, [dark, night, prefs.language, prefs.focusMode, prefs.ambient, prefs.lamp, level])
 
   useEffect(() => {
     const root = document.documentElement
@@ -73,6 +79,7 @@ export default function App() {
   const rtl = usePrefs((s) => s.prefs.language === 'ar')
   useAchievementWatcher()
   useReminders()
+  useAmbientSound()
 
   if (!ready) return null
   return (

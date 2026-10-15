@@ -14,8 +14,9 @@ export function DesktopSidebar() {
   const toggle = useUI((s) => s.toggleSidebar)
   return (
     <aside
+      data-dim
       className={cn(
-        'sticky top-0 hidden h-dvh shrink-0 flex-col border-e border-line bg-surface/60 py-5 transition-[width] duration-300 ease-[var(--ease-paper)] md:flex',
+        'sticky top-0 z-10 hidden h-dvh shrink-0 flex-col border-e border-line bg-surface/60 py-5 transition-[width] duration-300 ease-[var(--ease-paper)] md:flex',
         collapsed ? 'w-[76px] px-3' : 'w-60 px-4',
       )}
     >

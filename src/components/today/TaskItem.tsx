@@ -142,24 +142,30 @@ function TaskRow({
           className="min-w-0 flex-1 cursor-text py-1 text-start disabled:cursor-default"
           aria-label={`${task.title}${editable ? `, ${d.task.edit}` : ''}`}
         >
-          <span className="relative inline">
-            <motion.span
-              className="text-[15px] leading-snug break-words"
-              initial={false}
-              animate={{ color: task.completed || moved ? 'rgb(48 44 40 / 0.5)' : 'rgb(48 44 40 / 1)' }}
-              transition={{ duration: level === 'off' ? 0 : 0.3 }}
-            >
-              {task.title}
-            </motion.span>
-            <motion.span
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-[55%] h-[1.6px] rounded-full bg-[#302c28]/55"
-              style={{ originX: dir === 'rtl' ? 1 : 0 }}
-              initial={false}
-              animate={{ scaleX: task.completed ? 1 : 0 }}
-              transition={level === 'off' ? { duration: 0 } : { duration: level === 'full' ? 0.38 : 0.12, ease: [0.65, 0, 0.35, 1], delay: task.completed && level === 'full' ? 0.12 : 0 }}
-            />
-          </span>
+          {/* Strike drawn as a growing background so it sweeps across every wrapped line in order. */}
+          <motion.span
+            className="text-[15px] leading-snug break-words [box-decoration-break:clone]"
+            style={{
+              backgroundImage: 'linear-gradient(rgb(48 44 40 / 0.55), rgb(48 44 40 / 0.55))',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: dir === 'rtl' ? '100% 58%' : '0 58%',
+            }}
+            initial={false}
+            animate={{
+              color: task.completed || moved ? 'rgb(48 44 40 / 0.5)' : 'rgb(48 44 40 / 1)',
+              backgroundSize: task.completed ? '100% 1.6px' : '0% 1.6px',
+            }}
+            transition={
+              level === 'off'
+                ? { duration: 0 }
+                : {
+                    color: { duration: 0.3 },
+                    backgroundSize: { duration: level === 'full' ? 0.42 : 0.12, ease: [0.65, 0, 0.35, 1], delay: task.completed && level === 'full' ? 0.12 : 0 },
+                  }
+            }
+          >
+            {task.title}
+          </motion.span>
           {task.description && <span className="mt-0.5 line-clamp-2 block text-[13px] text-[#302c28]/60">{task.description}</span>}
           <Meta task={task} category={category} moved={moved} />
           {moved && (

@@ -1,4 +1,4 @@
-import { Check, Download, HardDrive, Keyboard, Pause, Play, Plus, Trash2, Upload, Volume2, X } from 'lucide-react'
+import { Moon, Check, Download, HardDrive, Keyboard, Pause, Play, Plus, Trash2, Upload, Volume2, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,7 @@ import { reportError } from '@/lib/errors'
 import { useI18n } from '@/lib/i18n'
 import { isIos, promptInstall, useInstall } from '@/lib/install'
 import { playSound } from '@/lib/sound'
+import { startAmbient } from '@/lib/ambient'
 import { WOOD_PALETTES } from '@/lib/textures'
 import { cn } from '@/lib/utils'
 import { usePrefs } from '@/store/prefs'
@@ -41,7 +42,7 @@ export function SettingsPanel() {
 
       <Section title={d.settings.appearance}>
         <Row label={d.settings.theme} stacked>
-          <Segmented label={d.settings.theme} value={prefs.theme} onChange={(theme) => update({ theme })} className="flex w-full" options={(['system', 'light', 'dark'] as const).map((v) => ({ value: v, label: d.settings.themes[v] }))} />
+          <Segmented label={d.settings.theme} value={prefs.theme} onChange={(theme) => update({ theme })} className="flex w-full" options={(['night', 'system', 'light', 'dark'] as const).map((v) => ({ value: v, label: d.settings.themes[v] }))} />
         </Row>
         <Row label={d.settings.wood} stacked>
           <div role="radiogroup" aria-label={d.settings.wood} className="grid grid-cols-3 gap-2">
@@ -74,6 +75,45 @@ export function SettingsPanel() {
         </Row>
         <Row label={d.settings.motivation}>
           <Switch checked={prefs.showMotivation} onCheckedChange={(showMotivation) => update({ showMotivation })} aria-label={d.settings.motivation} />
+        </Row>
+      </Section>
+
+      <Section title={d.settings.environment}>
+        {prefs.theme !== 'night' && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <p className="text-[13px] text-ink-soft">{d.settings.nightOnly}</p>
+            <Button variant="secondary" size="sm" onClick={() => update({ theme: 'night' })}>
+              <Moon /> {d.settings.themes.night}
+            </Button>
+          </div>
+        )}
+        <Row label={d.settings.focusMode} help={d.settings.focusHelp}>
+          <Switch checked={prefs.focusMode} onCheckedChange={(focusMode) => update({ focusMode })} aria-label={d.settings.focusMode} />
+        </Row>
+        <Row label={d.settings.showWindow}>
+          <Switch checked={prefs.showWindow} onCheckedChange={(showWindow) => update({ showWindow })} aria-label={d.settings.showWindow} />
+        </Row>
+        <Row label={d.settings.rain}>
+          <Switch checked={prefs.rain} onCheckedChange={(rain) => update({ rain })} aria-label={d.settings.rain} />
+        </Row>
+        <Row label={d.settings.rainIntensity} stacked>
+          <Slider value={[Math.round(prefs.rainIntensity * 100)]} onValueChange={([v]) => update({ rainIntensity: v / 100 })} min={10} max={100} step={5} disabled={!prefs.rain} thumbLabel={d.settings.rainIntensity} />
+        </Row>
+        <Row label={d.settings.ambient} help={d.settings.ambientHelp}>
+          <Switch checked={prefs.ambient} onCheckedChange={(ambient) => update({ ambient })} aria-label={d.settings.ambient} />
+        </Row>
+        <Row label={d.settings.lamp} stacked>
+          <Slider value={[Math.round(prefs.lamp * 100)]} onValueChange={([v]) => update({ lamp: v / 100 })} min={0} max={100} step={5} thumbLabel={d.settings.lamp} />
+        </Row>
+        <Row label={d.settings.ambientSound} help={d.settings.ambientSoundHelp}>
+          <Switch
+            checked={prefs.ambientSound}
+            onCheckedChange={(ambientSound) => {
+              update({ ambientSound })
+              if (ambientSound) startAmbient(prefs.volume, prefs.rainIntensity)
+            }}
+            aria-label={d.settings.ambientSound}
+          />
         </Row>
       </Section>
 
@@ -122,7 +162,7 @@ export function SettingsPanel() {
               onValueChange={([v]) => update({ volume: v / 100 })}
               max={100}
               step={5}
-              disabled={!prefs.sound}
+              disabled={!prefs.sound && !prefs.ambientSound}
               thumbLabel={d.settings.volume}
             />
             <Button variant="secondary" size="sm" disabled={!prefs.sound} onClick={() => playSound('chime')}>

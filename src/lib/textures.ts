@@ -15,8 +15,8 @@ interface WoodPalette {
 
 export const WOOD_PALETTES: Record<WoodTheme, WoodPalette> = {
   'light-oak': { light: [232, 206, 168], dark: [205, 168, 120], grain: [160, 118, 74], base: '#DCC198' },
-  'natural-oak': { light: [214, 170, 118], dark: [176, 128, 80], grain: [118, 78, 44], base: '#C99B6B' },
-  'dark-walnut': { light: [128, 90, 60], dark: [84, 56, 36], grain: [48, 30, 18], base: '#6E4C33' },
+  'natural-oak': { light: [206, 160, 112], dark: [170, 124, 82], grain: [110, 74, 44], base: '#B98B60' },
+  'dark-walnut': { light: [128, 92, 64], dark: [90, 62, 42], grain: [50, 32, 20], base: '#62452F' },
 }
 
 function rng(seed: number) {

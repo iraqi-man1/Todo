@@ -7,6 +7,8 @@ import { dur, useMotionLevel } from '@/hooks/useMotionLevel'
 import { useShortcuts } from '@/hooks/useShortcuts'
 import { useI18n } from '@/lib/i18n'
 import { useUI } from '@/store/ui'
+import { Environment, useEnvironment, WINDOW_W } from '@/components/environment/Environment'
+import { useMedia } from '@/hooks/useMedia'
 import { BottomNavigation } from './BottomNavigation'
 import { DesktopSidebar } from './DesktopSidebar'
 import { ShortcutsDialog } from './ShortcutsDialog'
@@ -22,6 +24,9 @@ export function AppShell() {
   const level = useMotionLevel()
   const { d } = useI18n()
   useShortcuts()
+  const env = useEnvironment()
+  const lg = useMedia('(min-width: 1024px)')
+  const reserve = env.windowShown && lg
 
   useEffect(() => {
     window.addEventListener('hashchange', setRouteFromHash)
@@ -37,12 +42,17 @@ export function AppShell() {
   const isWall = route.name === 'wall'
 
   return (
-    <div className="flex min-h-dvh">
+    <div className="relative flex min-h-dvh">
+      <Environment />
       <a href="#main" className="sr-only z-50 rounded-lg bg-surface px-4 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3">
         {d.skip}
       </a>
       <DesktopSidebar />
-      <main id="main" className={isWall ? 'relative h-dvh min-w-0 flex-1 overflow-hidden' : 'relative min-w-0 flex-1'}>
+      <main
+        id="main"
+        className={isWall ? 'relative z-10 h-dvh min-w-0 flex-1 overflow-hidden' : 'relative z-10 min-w-0 flex-1'}
+        style={reserve ? { paddingInlineEnd: `calc(${WINDOW_W} + 5vw)` } : undefined}
+      >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={route.name === 'today' ? 'today' : pageKey}

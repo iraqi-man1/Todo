@@ -307,3 +307,117 @@ body {
 :root.motion-reduced .dw-sheet[data-state='closed'] {
   animation-name: dw-fade-out;
 }
+
+/* ---------- Cozy Night ---------- */
+:root.night {
+  --dw-bg: #101827;
+  --dw-surface: rgb(25 37 55 / 0.86);
+  --dw-surface-2: rgb(38 52 75 / 0.85);
+  --dw-ink: #f5e7cf;
+  --dw-ink-soft: #b9ac97;
+  --dw-line: rgb(245 231 207 / 0.12);
+  --dw-accent: #e8ad67;
+  --dw-accent-ink: #1d1409;
+  --dw-success: #a6cf96;
+  --dw-danger: #f0a08a;
+  --dw-backdrop: transparent;
+  --dw-chart: #e0a35f;
+}
+
+:root.night body {
+  background: #101827;
+}
+
+/* Cards float in the room: translucent with a soft blur so the scene breathes through. */
+:root.night .bg-surface,
+:root.night .bg-surface\/90,
+:root.night .bg-surface\/85,
+:root.night .bg-surface\/80,
+:root.night .bg-surface\/60 {
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+/* Lamp light warms the paper; strength follows the lamp-brightness setting. */
+:root.night .paper {
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / 0.25),
+    0 4px 8px -2px rgb(0 0 0 / 0.35),
+    0 16px 26px -12px rgb(0 0 0 / 0.6);
+}
+:root.night .paper {
+  background-image:
+    radial-gradient(ellipse 120% 90% at 15% 0%, rgb(255 214 150 / calc(var(--lamp, 0) * 0.22)), transparent 70%),
+    linear-gradient(0deg, rgb(16 24 39 / calc(0.16 - var(--lamp, 0) * 0.12)), rgb(16 24 39 / calc(0.16 - var(--lamp, 0) * 0.12))),
+    var(--paper-noise),
+    linear-gradient(180deg, rgb(0 0 0 / 0.035) 0, rgb(0 0 0 / 0) 13%),
+    linear-gradient(165deg, rgb(255 255 255 / 0.35), rgb(255 255 255 / 0) 45%, rgb(0 0 0 / 0.05));
+  background-size:
+    100% 100%,
+    100% 100%,
+    160px 160px,
+    100% 100%,
+    100% 100%;
+}
+
+:root.night .wall-backdrop {
+  background: transparent;
+}
+
+@keyframes dw-clouds {
+  from {
+    transform: translateX(-30%);
+  }
+  to {
+    transform: translateX(30%);
+  }
+}
+@keyframes dw-twinkle {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes dw-lamp {
+  50% {
+    opacity: calc(var(--lamp) * 0.92);
+  }
+}
+.dw-clouds {
+  animation: dw-clouds 160s linear infinite alternate;
+}
+.dw-twinkle {
+  animation: dw-twinkle 6s ease-in-out infinite;
+}
+.dw-lamp-breathe {
+  animation: dw-lamp 9s ease-in-out infinite;
+}
+:root.still .dw-clouds,
+:root.still .dw-twinkle,
+:root.still .dw-lamp-breathe,
+:root.motion-reduced .dw-clouds,
+:root.motion-reduced .dw-twinkle,
+:root.motion-reduced .dw-lamp-breathe {
+  animation: none;
+}
+
+/* ---------- Focus mode ---------- */
+:root.focus-mode [data-dim] {
+  opacity: 0.32;
+  transition: opacity 0.4s ease;
+}
+:root.focus-mode [data-dim]:hover,
+:root.focus-mode [data-dim]:focus-within {
+  opacity: 1;
+}
+:root.focus-mode [data-note-idle] {
+  opacity: 0.45;
+  filter: saturate(0.6);
+  transition:
+    opacity 0.4s ease,
+    filter 0.4s ease;
+}
+:root.focus-mode [data-note-idle]:hover,
+:root.focus-mode [data-note-idle]:focus-within {
+  opacity: 1;
+  filter: none;
+}

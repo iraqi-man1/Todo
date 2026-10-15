@@ -3,6 +3,7 @@ import { NAV_ITEMS } from '@/components/layout/navItems'
 import { isTypingTarget } from '@/lib/utils'
 import { useToday } from './useToday'
 import { useUI } from '@/store/ui'
+import { usePrefs } from '@/store/prefs'
 
 /** Global keyboard shortcuts. Ignored while typing or when a dialog is open. */
 export function useShortcuts() {
@@ -25,6 +26,10 @@ export function useShortcuts() {
         e.preventDefault()
         if (ui.route.name !== 'wall') ui.navigate({ name: 'wall' })
         ui.setSearchOpen(true)
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault()
+        const p = usePrefs.getState()
+        p.update({ focusMode: !p.prefs.focusMode })
       } else if (e.key === '?') {
         e.preventDefault()
         ui.setShortcutsOpen(true)

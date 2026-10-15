@@ -120,7 +120,7 @@ export interface AchievementRecord {
   unlockedAt: number
 }
 
-export type ThemePref = 'system' | 'light' | 'dark'
+export type ThemePref = 'night' | 'system' | 'light' | 'dark'
 export type WoodTheme = 'light-oak' | 'natural-oak' | 'dark-walnut'
 export type MotionPref = 'auto' | 'full' | 'reduced' | 'off'
 export type Language = 'en' | 'ar'
@@ -141,13 +141,21 @@ export interface Prefs {
   showMotivation: boolean
   remindersEnabled: boolean
   reminderTime: string
+  /** Cozy Night environment */
+  rain: boolean
+  rainIntensity: number
+  ambient: boolean
+  lamp: number
+  showWindow: boolean
+  ambientSound: boolean
+  focusMode: boolean
   updatedAt: number
 }
 
 export const DEFAULT_PREFS: Prefs = {
   id: 'prefs',
   name: '',
-  theme: 'system',
+  theme: 'night',
   wood: 'natural-oak',
   motion: 'auto',
   sound: false,
@@ -159,5 +167,12 @@ export const DEFAULT_PREFS: Prefs = {
   showMotivation: true,
   remindersEnabled: false,
   reminderTime: '20:00',
+  rain: true,
+  rainIntensity: 0.5,
+  ambient: true,
+  lamp: 0.7,
+  showWindow: true,
+  ambientSound: false,
+  focusMode: false,
   updatedAt: 0,
 }

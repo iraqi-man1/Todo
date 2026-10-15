@@ -1,4 +1,6 @@
 import { ArrowRightToLine, CalendarDays, ChevronLeft, ChevronRight, NotebookPen, Pin, PinOff, Plus } from 'lucide-react'
+import { Board } from '@/components/wall/Board'
+import { FocusToggle } from '@/components/environment/FocusToggle'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -57,6 +59,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
   const [flying, setFlying] = useState(false)
   const [confirmUnpin, setConfirmUnpin] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
+  const [activeNote, setActiveNote] = useState<string | null>(null)
 
   useEffect(() => {
     materializeRecurrences(date, today, prefs.defaultNoteColor).catch(reportError)
@@ -149,6 +152,11 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
   const greeting =
     hour < 5 ? d.greeting.night : hour < 12 ? d.greeting.morning : hour < 18 ? d.greeting.afternoon : hour < 22 ? d.greeting.evening : d.greeting.night
   const motivation = seededPick(date, d.motivation)
+  const focus = prefs.focusMode
+  const currentNote =
+    (activeNote && day?.notes.some((n) => n.id === activeNote) ? activeNote : null) ??
+    day?.notes.find((n) => day.tasks.some((t) => t.noteId === n.id && !t.completed))?.id ??
+    day?.notes[0]?.id
   const showCelebrate = !!summary?.complete && !day?.archive && dismissed !== date && !flying
 
   return (
@@ -173,6 +181,8 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <FocusToggle />
+            <span data-dim className="flex items-center gap-1">
             <Button variant="ghost" size="iconSm" onClick={() => go(-1)} aria-label={d.today.prevDay}>
               <ChevronLeft className="rtl:rotate-180" />
             </Button>
@@ -184,12 +194,13 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
             <Button variant="ghost" size="iconSm" onClick={() => go(1)} aria-label={d.today.nextDay}>
               <ChevronRight className="rtl:rotate-180" />
             </Button>
+            </span>
           </div>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-3xl border border-line bg-surface px-4 py-3.5 shadow-soft">
           <DailyProgress done={summary?.completed ?? 0} total={summary?.total ?? 0} level={level} />
-          {prefs.showMotivation && isToday && <p className="font-hand text-xl text-ink-soft sm:max-w-[16rem] sm:text-end">{motivation}</p>}
+          {prefs.showMotivation && isToday && <p data-dim className="font-hand text-xl text-ink-soft sm:max-w-[16rem] sm:text-end">{motivation}</p>}
         </div>
       </header>
 
@@ -263,6 +274,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
           {day.notes.length === 0 ? (
             <EmptyDay editable={editable} onStart={ensureFirstNote} />
           ) : (
+            <FocusSurface on={focus}>
             <div className={cn('grid gap-5', day.notes.length > 1 && 'md:grid-cols-2')}>
               <AnimatePresence initial={false}>
                 {day.notes.map((n) => (
@@ -274,6 +286,9 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
                     exit={level === 'off' ? undefined : { opacity: 0, scale: 0.95, transition: { duration: 0.18 } }}
                     transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                     className={cn(day.notes.length > 1 && day.notes.length % 2 === 1 && n === day.notes[0] && 'md:col-span-2')}
+                    data-note-idle={focus && day.notes.length > 1 && n.id !== currentNote ? '' : undefined}
+                    onFocusCapture={() => setActiveNote(n.id)}
+                    onPointerDownCapture={() => setActiveNote(n.id)}
                   >
                     <PlannerNote
                       ref={(h) => {
@@ -295,12 +310,13 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
                 ))}
               </AnimatePresence>
             </div>
+            </FocusSurface>
           )}
         </motion.div>
       )}
 
       {day && (
-        <div className="mt-5 flex flex-wrap items-center gap-2">
+        <div data-dim className="mt-5 flex flex-wrap items-center gap-2">
           {editable && day.notes.length > 0 && (
             <Button variant="secondary" onClick={newNote}>
               <Plus /> {d.today.newNote}
@@ -384,5 +400,15 @@ function DayDetails({ date, title, note }: { date: DateKey; title: string; note:
       <Input value={t} onChange={(e) => setT(e.target.value)} onBlur={save} placeholder={d.today.dayTitlePlaceholder} aria-label={d.today.dayTitlePlaceholder} maxLength={60} />
       <Textarea value={n} onChange={(e) => setN(e.target.value)} onBlur={save} placeholder={d.today.personalNotePlaceholder} aria-label={d.today.personalNotePlaceholder} maxLength={1000} rows={3} />
     </div>
+  )
+}
+
+/** In Focus Mode the notes are pinned up on a small section of the wooden wall. */
+function FocusSurface({ on, children }: { on: boolean; children: React.ReactNode }) {
+  if (!on) return <>{children}</>
+  return (
+    <Board padding={18} className="sm:!p-7">
+      {children}
+    </Board>
   )
 }
