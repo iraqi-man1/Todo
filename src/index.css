@@ -311,6 +311,8 @@ body {
 
 /* ---------- Cozy Night ---------- */
 :root.night {
+  /* the top of the painted night wall, where the desktop window controls sit */
+  --dw-titlebar: #152034;
   --dw-bg: #101827;
   --dw-surface: rgb(25 37 55 / 0.86);
   --dw-surface-2: rgb(38 52 75 / 0.85);
@@ -505,4 +507,26 @@ body {
   .dw-no-print {
     display: none !important;
   }
+}
+
+/* ---------- Windows desktop app (frameless window) ----------
+   The native title bar is hidden; a 32px strip along the top drags the window, Windows' own
+   min/max/close buttons are drawn over the top-right corner (in the theme's colours), and every
+   interactive element stays clickable even where it overlaps the strip. */
+:root[data-desktop] {
+  --safe-top: max(env(safe-area-inset-top, 0px), 32px);
+}
+:root[data-desktop] body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 32px;
+  z-index: 2147483000;
+  -webkit-app-region: drag;
+  app-region: drag;
+  pointer-events: none;
+}
+:root[data-desktop] :is(button, a, input, select, textarea, label, [role='button'], [role='tab'], [role='radio'], [role='checkbox'], [role='slider'], [role='menuitem'], [role='dialog'], [contenteditable='true']) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
