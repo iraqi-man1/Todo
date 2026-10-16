@@ -1,6 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRightToLine, Check, CircleDashed, Clock, LocateFixed, NotebookPen, Pin, X } from 'lucide-react'
+import { ArrowRightToLine, Check, CircleDashed, Clock, LocateFixed, NotebookPen, Pin, PinOff, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -28,6 +28,7 @@ interface ViewModel {
   date: DateKey
   archived: boolean
   archivedAt: number | null
+  stampPressure?: number
   moved: boolean
   color: NoteColor
   title: string
@@ -48,6 +49,7 @@ function useViewModel(date: DateKey | undefined, fallback: NoteColor): ViewModel
         date,
         archived: true,
         archivedAt: archive.archivedAt,
+        stampPressure: archive.stampPressure,
         moved: !!archive.offset,
         color: archive.color,
         title: archive.title,
@@ -134,6 +136,7 @@ function ModalBody({ state, onClose }: { state: InspectState; onClose: () => voi
   const today = useToday()
   const navigate = useUI((s) => s.navigate)
   const setJustPinned = useUI((s) => s.setJustPinned)
+  const setUnpinning = useUI((s) => s.setUnpinning)
   const [editing, setEditing] = useState(false)
   const collection = useCollection()
 
@@ -217,7 +220,7 @@ function ModalBody({ state, onClose }: { state: InspectState; onClose: () => voi
                   </div>
                 )}
 
-                {vm?.archived && <DoneStamp size={78} label={d.stamp} variant={collection.stamp} sub={date(state.date, 'short').toUpperCase()} className="absolute end-6 top-16 sm:end-8" />}
+                {vm?.archived && <DoneStamp size={78} label={d.stamp} variant={collection.stamp} seed={state.date} pressure={vm.stampPressure ?? 0.7} sub={date(state.date, 'short').toUpperCase()} className="absolute end-6 top-16 sm:end-8" />}
 
                 {vm && (
                   <div className="mt-6">
@@ -279,6 +282,19 @@ function ModalBody({ state, onClose }: { state: InspectState; onClose: () => voi
                   {vm?.moved && (
                     <button type="button" className={paperBtn} onClick={() => void setArchiveOffset(state.date, undefined).catch(reportError)}>
                       <LocateFixed className="size-4" /> {d.detail.resetPosition}
+                    </button>
+                  )}
+                  {vm?.archived && (
+                    <button
+                      type="button"
+                      className={paperBtn}
+                      onClick={() => {
+                        onClose()
+                        // let the card fly back to its slot first, then pull the pin there
+                        setTimeout(() => setUnpinning(state.date), level === 'full' ? 520 : 60)
+                      }}
+                    >
+                      <PinOff className="size-4" /> {d.detail.unpinFromWall}
                     </button>
                   )}
                   {canPin && (

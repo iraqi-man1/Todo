@@ -20,6 +20,8 @@ import {
 } from '@/domain/actions'
 import { uDeleteNote, uDeleteTask, uPin, uToggleTask, uUnpin } from '@/domain/undoable'
 import { toastWithUndo } from '@/lib/undoUi'
+import { rememberToss, tossToBasket } from '@/lib/toss'
+import { NOTE_HEX } from '@/domain/colors'
 import { seededPick } from '@/domain/colors'
 import { summarizeTasks } from '@/domain/summary'
 import type { DateKey, DayNote, Task } from '@/domain/types'
@@ -34,6 +36,7 @@ import { cn } from '@/lib/utils'
 import { usePrefs } from '@/store/prefs'
 import { useUI } from '@/store/ui'
 import { CompletionCelebration } from './CompletionCelebration'
+import { StickyPad } from './StickyPad'
 import { useCompletionTransition } from '@/hooks/useCompletionTransition'
 import { useEffects } from '@/hooks/useMotionLevel'
 import { DailyProgress } from './DailyProgress'
@@ -87,9 +90,18 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
   }
 
   const onDelete = async (t: Task) => {
+    // measure the row before it goes, so the paper ball starts where the task was
+    const rect = document.querySelector(`[data-task-id="${t.id}"]`)?.getBoundingClientRect()
+    const color = NOTE_HEX[day?.notes.find((n) => n.id === t.noteId)?.color ?? prefs.defaultNoteColor]
     try {
       const entry = await uDeleteTask(t.id)
-      if (entry) toastWithUndo(d.task.deleted, entry, t.title)
+      if (entry) {
+        if (rect && fx.physics) {
+          tossToBasket(rect, t.title, color, level)
+          rememberToss(entry, t.id, color)
+        }
+        toastWithUndo(d.task.deleted, entry, t.title)
+      }
     } catch (e) {
       reportError(e)
     }
@@ -166,10 +178,11 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
     navigate({ name: 'wall' })
   }
 
-  const pin = async () => {
+  const pin = async (pressure = 0.7) => {
     try {
-      const res = await uPin(date)
+      const res = await uPin(date, { stampPressure: pressure })
       if (!res.ok) return
+      playSound('stamp', { pressure })
       playSound('paper')
       endSequence()
       // Fly toward the wall: the "My Wall" navigation item if it's on screen.
@@ -298,7 +311,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
           animate={{ opacity: 1, y: 0 }}
           className="mb-5 flex flex-col gap-4 rounded-3xl border border-line bg-surface p-5 shadow-soft sm:flex-row sm:items-center"
         >
-          <DoneStamp size={64} className="shrink-0" label={d.stamp} onPaper={false} ink="var(--dw-success)" />
+          <DoneStamp size={64} className="shrink-0" label={d.stamp} onPaper={false} ink="var(--dw-success)" seed={date} pressure={day.archive.stampPressure ?? 0.7} />
           <div className="flex-1">
             <p className="font-semibold">{d.today.pinnedTitle}</p>
             <p className="mt-0.5 text-sm text-ink-soft">{f(d.today.pinnedBody, { time: time(day.archive.archivedAt) })}</p>
@@ -410,9 +423,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
       {day && (
         <div data-dim className="mt-5 flex flex-wrap items-center gap-2">
           {editable && day.notes.length > 0 && (
-            <Button variant="secondary" onClick={newNote}>
-              <Plus /> {d.today.newNote}
-            </Button>
+            <StickyPad color={nextNoteColor(day.notes.map((n) => n.color), prefs.defaultNoteColor)} level={level} onPeel={newNote} />
           )}
           <Button variant="ghost" onClick={() => setShowDetails((v) => !v)} aria-expanded={showDetails}>
             <NotebookPen /> {d.today.dayDetails}

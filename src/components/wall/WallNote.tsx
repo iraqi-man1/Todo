@@ -1,6 +1,6 @@
 import { CircleDashed, Plus } from 'lucide-react'
-import { motion } from 'motion/react'
-import { memo, useEffect } from 'react'
+import { motion, useAnimationControls } from 'motion/react'
+import { memo, useEffect, useState } from 'react'
 import { DraggableNote, type Offset } from './drag'
 import { PaperPhysics } from '@/components/paper/PaperPhysics'
 import { useEffects } from '@/hooks/useMotionLevel'
@@ -14,6 +14,10 @@ import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { useI18n } from '@/lib/i18n'
 import { playSound } from '@/lib/sound'
 import { cn } from '@/lib/utils'
+import { uUnpin } from '@/domain/undoable'
+import { reportError } from '@/lib/errors'
+import { toastWithUndo } from '@/lib/undoUi'
+import { useUI } from '@/store/ui'
 
 export type SlotStatus = 'pinned' | 'ready' | 'unfinished' | 'today' | 'future' | 'empty'
 
@@ -63,13 +67,13 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
 
   useEffect(() => {
     if (!arrive || level === 'off') return
-    const t1 = setTimeout(() => playSound('pin'), level === 'full' ? 1080 : 250)
+    const t1 = setTimeout(() => playSound('pin', { pin: pin ?? 'red' }), level === 'full' ? 1080 : 250)
     const t2 = setTimeout(() => onArrived?.(), 3000)
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
     }
-  }, [arrive, level, onArrived])
+  }, [arrive, level, onArrived, pin])
 
   if (status === 'empty' || status === 'future' || (status === 'today' && total === 0)) {
     const interactive = status === 'today'
@@ -134,7 +138,9 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
   // Arrival: glide in, wait for the pin, then swing to rest around it.
   const arriveFull = arrive && full
   return (
-    <DraggableNote date={date} offset={offset} level={level} enabled={pinned && !arrive} amp={fx.physics ? fx.amp : 0}>
+    <DraggableNote date={date} offset={offset} level={level} enabled={pinned && !arrive} amp={fx.physics ? fx.amp : 0} size={size}>
+    <UnpinFall date={date} pinned={pinned} pin={pin ?? 'red'} level={level} rot={rot}>
+      {(pinControls) => (
     <motion.button
       type="button"
       data-date={date}
@@ -193,7 +199,7 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
             transition={arrive ? { delay: full ? 2.0 : 0.3, type: 'spring', stiffness: 380, damping: 14 } : { duration: 0 }}
           >
-            <DoneStamp size={lg ? 64 : 44} label={d.stamp} rotate={-14 + rot * 2} variant={stamp} />
+            <DoneStamp size={lg ? 64 : 44} label={d.stamp} rotate={-14 + rot * 2} variant={stamp} seed={date} pressure={archive?.stampPressure ?? 0.7} />
           </motion.span>
         )}
       </PaperPhysics>
@@ -201,7 +207,7 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
         <motion.span
           className="absolute -top-1.5 left-1/2 z-10 -ml-[9px] block"
           initial={arrive && level !== 'off' ? (full ? { y: -18, scale: 1.3, opacity: 0 } : { opacity: 0 }) : false}
-          animate={{ y: 0, scale: 1, opacity: 1 }}
+          animate={pinControls ?? { y: 0, scale: 1, opacity: 1 }}
           transition={
             arrive
               ? full
@@ -216,9 +222,81 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
         <span aria-hidden className="absolute -top-2 left-1/2 h-5 w-14 -translate-x-1/2 rotate-[3deg] bg-[rgb(255_253_240/0.55)] shadow-[0_1px_2px_rgb(0_0_0/0.15)]" />
       )}
     </motion.button>
+      )}
+    </UnpinFall>
     </DraggableNote>
   )
 })
+
+/**
+ * Taking a note off the wall, physically: the pin resists (a few strained wiggles as it's pulled
+ * toward you), pops free and spins away; the note, no longer held, drops under gravity, fluttering
+ * side to side as it falls. Only then is the day actually unpinned (undoable from the toast).
+ */
+function UnpinFall({ date, pinned, pin, level, rot, children }: { date: DateKey; pinned: boolean; pin: PinStyle; level: MotionLevel; rot: number; children: (pinControls: ReturnType<typeof useAnimationControls> | null) => React.ReactNode }) {
+  const unpinning = useUI((s) => s.unpinning === date && pinned)
+  const setUnpinning = useUI((s) => s.setUnpinning)
+  const { d } = useI18n()
+  const pinCtl = useAnimationControls()
+  const body = useAnimationControls()
+  const [active, setActive] = useState(false)
+
+  useEffect(() => {
+    if (!unpinning) return
+    let cancelled = false
+    const dir = rot >= 0 ? 1 : -1
+    const finish = async () => {
+      const entry = await uUnpin(date).catch(reportError)
+      if (entry) toastWithUndo(d.history.labels.dayUnpinned, entry)
+      setUnpinning(null)
+      if (cancelled) return
+      setActive(false)
+      // the slot comes back as "ready to pin"; let it settle in rather than pop
+      body.set({ y: -14, x: 0, rotate: 0, opacity: 0 })
+      void body.start({ y: 0, opacity: 1, transition: level === 'full' ? { type: 'spring', stiffness: 260, damping: 20 } : { duration: 0.15 } })
+    }
+    const run = async () => {
+      setActive(true)
+      if (level === 'off') return finish()
+      playSound('unpin', { pin })
+      if (level === 'full') {
+        // resisting: strained little jerks, the pin rising toward the viewer
+        await pinCtl.start({
+          y: [0, -1.5, -0.5, -3, -1.5, -5],
+          x: [0, -1, 1, -1.5, 1, 0],
+          scale: [1, 1.06, 1.03, 1.1, 1.07, 1.22],
+          transition: { duration: 0.36, ease: 'easeInOut' },
+        })
+        if (cancelled) return
+        void pinCtl.start({ y: -80, x: 34 * dir, rotate: 300 * dir, scale: 1.1, opacity: 0, transition: { duration: 0.55, ease: [0.15, 0.7, 0.4, 1] } })
+        playSound('flutter')
+        // free fall: accelerating drop with a side-to-side flutter and a growing tilt
+        await body.start({
+          y: [0, -8, 30, 120, 300],
+          x: [0, 2, -12 * dir, 16 * dir, -6 * dir],
+          rotate: [0, -2 * dir, 9 * dir, -6 * dir, 24 * dir],
+          opacity: [1, 1, 1, 0.85, 0],
+          transition: { duration: 1.05, times: [0, 0.1, 0.38, 0.68, 1], ease: ['easeOut', 'easeIn', 'easeIn', 'easeIn'] },
+        })
+      } else {
+        await pinCtl.start({ opacity: 0, transition: { duration: 0.12 } })
+        await body.start({ y: 24, opacity: 0, transition: { duration: 0.22, ease: 'easeIn' } })
+      }
+      if (!cancelled) await finish()
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
+    // runs once per unpin request; the controls and callbacks are stable
+  }, [unpinning])
+
+  return (
+    <motion.div animate={body} style={{ originY: 0 }} className={cn('relative', active && 'pointer-events-none z-40')}>
+      {children(active ? pinCtl : null)}
+    </motion.div>
+  )
+}
 
 /** A small round sticker with the day's mood, stuck near the bottom corner of the paper. */
 function MoodSticker({ mood, size }: { mood: Mood; size: 'md' | 'lg' }) {

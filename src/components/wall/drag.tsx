@@ -1,7 +1,8 @@
-import { animate, motion, useMotionValue, useSpring, useTransform } from 'motion/react'
+import { animate, motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'motion/react'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { DateKey } from '@/domain/types'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
+import { startRustle } from '@/lib/sound'
 import { cn } from '@/lib/utils'
 
 export interface Rect {
@@ -52,6 +53,41 @@ export interface SlotLayout {
 
 export const SlotLayoutContext = createContext<SlotLayout | null>(null)
 
+/** How fast the wall itself is moving (pan px/s and zoom per second), so pinned notes can swing. */
+export interface WallSwing {
+  vx: MotionValue<number>
+  vy: MotionValue<number>
+  vs: MotionValue<number>
+}
+export const WallSwingContext = createContext<WallSwing | null>(null)
+
+const clampDeg = (v: number, m: number) => Math.max(-m, Math.min(m, v))
+
+/**
+ * A note hanging from its pin behaves like a damped pendulum: when the wall is dragged it trails
+ * behind the motion, then swings back and forth and comes to rest. Big notes swing slower (longer
+ * period, lower stiffness) than small ones; a zoom gives each note a little flutter in its own
+ * direction. Pure motion values: nothing re-renders, and it is idle while the wall is still.
+ */
+function usePinSwing(size: 'md' | 'lg', seed: number, amp: number) {
+  const ctx = useContext(WallSwingContext)
+  const zero = useMotionValue(0)
+  const vx = ctx?.vx ?? zero
+  const vy = ctx?.vy ?? zero
+  const vs = ctx?.vs ?? zero
+  const dir = seed % 2 ? 1 : -1
+  const target = useTransform(() => {
+    if (amp <= 0) return 0
+    // sideways pan tips the note against the motion; vertical motion barely matters to a pendulum,
+    // except that moving up quickly "lightens" it for a moment
+    const pan = -vx.get() * 0.009
+    const lift = Math.abs(vy.get()) * 0.0012 * dir
+    const zoom = vs.get() * 9 * dir
+    return clampDeg((pan + lift + zoom) * amp, 11)
+  })
+  return useSpring(target, size === 'lg' ? { stiffness: 46, damping: 4.2, mass: 1.15 } : { stiffness: 78, damping: 5.2, mass: 0.9 })
+}
+
 export interface WallGesture {
   cancelPan: () => void
   scale: () => number
@@ -71,6 +107,7 @@ export function DraggableNote({
   level,
   enabled,
   amp = 1,
+  size = 'md',
   children,
   className,
 }: {
@@ -80,6 +117,8 @@ export function DraggableNote({
   enabled: boolean
   /** Physics strength (0 disables tilt/swing; dragging still works). */
   amp?: number
+  /** Pendulum period: large notes swing slower. */
+  size?: 'md' | 'lg'
   children: React.ReactNode
   className?: string
 }) {
@@ -94,6 +133,8 @@ export function DraggableNote({
   const shadowOpacity = useTransform(lift, (v) => v * 0.55)
   const shadowScale = useTransform(lift, (v) => 0.9 + v * 0.18)
   const [lifted, setLifted] = useState(false)
+  const seed = Number(date.replaceAll('-', '')) || 0
+  const swing = usePinSwing(size, seed, level === 'full' && !lifted ? amp : 0)
   const st = useRef<{
     timer?: ReturnType<typeof setTimeout>
     sx: number
@@ -105,7 +146,9 @@ export function DraggableNote({
     lx: number
     lt: number
     up: boolean
-  }>({ sx: 0, sy: 0, base: { x: 0, y: 0 }, id: null, suppress: false, vx: 0, lx: 0, lt: 0, up: false })
+    ly: number
+    rustle: ReturnType<typeof startRustle>
+  }>({ sx: 0, sy: 0, base: { x: 0, y: 0 }, id: null, suppress: false, vx: 0, lx: 0, lt: 0, up: false, ly: 0, rustle: null })
   const active = enabled && !!layout && !!gesture
 
   // Follow external changes (undo, import, reset) when not being dragged.
@@ -141,6 +184,8 @@ export function DraggableNote({
   const drop = (target: Offset) => {
     if (!st.current.up) return
     st.current.up = false
+    st.current.rustle?.stop()
+    st.current.rustle = null
     setLifted(false)
     lift.set(0)
     commit(target)
@@ -156,6 +201,7 @@ export function DraggableNote({
         s.sx = e.clientX
         s.sy = e.clientY
         s.lx = e.clientX
+        s.ly = e.clientY
         s.lt = performance.now()
         s.vx = 0
         s.id = e.pointerId
@@ -173,6 +219,7 @@ export function DraggableNote({
           s.up = true
           setLifted(true)
           lift.set(1)
+          s.rustle = level === 'off' ? null : startRustle()
           if (amp > 0) tilt.set(-1.5 * amp)
           navigator.vibrate?.(8)
         }, HOLD_MS[e.pointerType as keyof typeof HOLD_MS] ?? 220)
@@ -192,9 +239,13 @@ export function DraggableNote({
         y.set(Math.max(-lim.y - 12, Math.min(lim.y + 12, ny)))
         // Lean into the motion: smoothed horizontal speed → rotation (capped, so it never wobbles).
         const now = performance.now()
-        const v = (e.clientX - s.lx) / Math.max(8, now - s.lt)
+        const dtm = Math.max(8, now - s.lt)
+        const v = (e.clientX - s.lx) / dtm
         s.vx = s.vx * 0.7 + v * 0.3
+        // the paper's rustle follows how fast it's being moved
+        s.rustle?.update(Math.hypot(e.clientX - s.lx, e.clientY - s.ly) / dtm)
         s.lx = e.clientX
+        s.ly = e.clientY
         s.lt = now
         if (amp > 0) tilt.set(Math.max(-8, Math.min(8, s.vx * 9)) * amp)
       }}
@@ -234,8 +285,11 @@ export function DraggableNote({
         className="pointer-events-none absolute inset-[4%] rounded-[30%]"
         style={{ y: shadowY, scale: shadowScale, opacity: shadowOpacity, background: 'radial-gradient(ellipse at 50% 55%, rgb(15 8 2 / 0.7), transparent 70%)' }}
       />
-      <motion.div style={{ rotate: tilt, scale }} className={cn('relative', lifted && 'cursor-grabbing')}>
-        {children}
+      {/* pendulum around the pin (top centre); the carry tilt sits inside it */}
+      <motion.div style={{ rotate: swing, originY: 0 }} className="relative">
+        <motion.div style={{ rotate: tilt, scale }} className={cn('relative', lifted && 'cursor-grabbing')}>
+          {children}
+        </motion.div>
       </motion.div>
     </motion.div>
   )

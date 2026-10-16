@@ -111,8 +111,8 @@ export async function uUnpin(date: DateKey) {
   return e
 }
 
-export async function uPin(date: DateKey) {
-  const res = await archiveDay(date)
+export async function uPin(date: DateKey, opts: { stampPressure?: number } = {}) {
+  const res = await archiveDay(date, opts)
   if (res.ok && res.created) {
     const archive = res.archive
     record({ label: 'dayPinned', undo: () => unarchiveDay(date), redo: () => restoreArchive(archive) })

@@ -92,6 +92,8 @@ export interface Archive {
   /** User nudge of the note inside its wall slot, in board pixels (snapped). */
   offset?: { x: number; y: number }
   mood?: Mood | null
+  /** How hard the DONE stamp was pressed when pinning (0–1); older snapshots don't have it. */
+  stampPressure?: number
 }
 
 /**

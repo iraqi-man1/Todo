@@ -6,6 +6,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragMoveEvent,
 } from '@dnd-kit/core'
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -27,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { uAddTask, uReorder, uSetSubtask, uUpdateNote, uUpdateTask } from '@/domain/undoable'
-import { playSound } from '@/lib/sound'
+import { playSound, startRustle } from '@/lib/sound'
 import { NOTE_HEX } from '@/domain/colors'
 import { NOTE_COLORS, type Category, type DayNote, type Goal, type Task } from '@/domain/types'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
@@ -120,7 +121,25 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
   const byId = new Map(tasks.map((t) => [t.id, t]))
   const ordered = order.map((id) => byId.get(id)).filter((t): t is Task => !!t)
 
+  // reordering rustles too, louder the faster the task is dragged
+  const rustle = useRef<{ r: ReturnType<typeof startRustle>; y: number; t: number } | null>(null)
+  const onDragStart = () => {
+    rustle.current = level === 'off' ? null : { r: startRustle(), y: 0, t: performance.now() }
+  }
+  const onDragMove = (e: DragMoveEvent) => {
+    const s = rustle.current
+    if (!s) return
+    const now = performance.now()
+    s.r?.update(Math.abs(e.delta.y - s.y) / Math.max(8, now - s.t))
+    s.y = e.delta.y
+    s.t = now
+  }
+  const stopRustle = () => {
+    rustle.current?.r?.stop()
+    rustle.current = null
+  }
   const onDragEnd = (e: DragEndEvent) => {
+    stopRustle()
     if (!e.over || e.active.id === e.over.id) return
     const next = arrayMove(order, order.indexOf(String(e.active.id)), order.indexOf(String(e.over.id)))
     setOrder(next)
@@ -144,7 +163,7 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
   useEffect(() => {
     if (allDone && !wasDone.current) {
       setStampKey((k) => k + 1)
-      if (fx.celebration) setTimeout(() => playSound('pin'), level === 'full' ? 620 : 0)
+      if (fx.celebration) setTimeout(() => playSound('stamp', { pressure: 0.75 }), level === 'full' ? 620 : 0)
     }
     wasDone.current = allDone
   }, [allDone, level, fx.celebration])
@@ -240,12 +259,12 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
               transition={{ type: 'spring', stiffness: 420, damping: 16, delay: level === 'full' ? 0.55 : 0 }}
             >
-              <DoneStamp size={74} label={d.stampCompleted} rotate={-10} variant={collection.stamp} />
+              <DoneStamp size={74} label={d.stampCompleted} rotate={-10} variant={collection.stamp} seed={note.id} />
             </motion.span>
           )}
         </AnimatePresence>
 
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} modifiers={[restrictToVerticalAxis, restrictToParentElement]}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={stopRustle} modifiers={[restrictToVerticalAxis, restrictToParentElement]}>
           <SortableContext items={visible.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             <ul className="mt-2 flex flex-col">
               {visible.map((t) => (

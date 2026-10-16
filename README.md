@@ -30,6 +30,13 @@ DoneWall is a cozy, offline-first to-do app. Plan your day on sticky notes; when
 - **Settings search**: a search field and section shortcuts at the top of Settings.
 - **Haptics**: a light vibration on supported phones when you check a task, finish the day or pin a note (can be turned off).
 - **Task Shelf**: a personal library of reusable tasks, opened with the bookmark beside any note's "Add a task" field (or "From Task Shelf" on an empty day). Search instantly, save new tasks, tick several and add them together, or tap + to add one. Saved tasks can be renamed, deleted (with confirmation and undo) and reordered, and sorted by your own order or by recent use. Save any existing task with its bookmark. Added tasks are independent, incomplete copies: completing or editing them never touches the template or other days, and a task already on the note isn't added twice. Nothing repeats on its own. The shelf works offline and is included in backups.
+- **Physical details**:
+  - Pinned notes hang like damped pendulums from their pins: drag or zoom the wall and they trail behind, swing, and settle. Large notes swing more slowly than small ones.
+  - A deleted task crumples into a paper ball, flies on a ballistic arc into a wastebasket, clips the rim and drops in. Undo brings it back out and unfolds it.
+  - New notes peel off a sticky pad: pull the corner and the top sheet lifts from its glued edge; let go early and it flaps back.
+  - "Take off the wall" makes the pin resist and pop out, and the note falls under gravity, fluttering.
+  - Holding "Pin to My Wall" presses the stamp harder (a darker, crisper imprint). Every stamp has its own ink gaps and unevenness.
+  - Paper rustle follows drag speed, each pin material has its own click, and stamps thump according to how hard they were pressed.
 - **Focus Mode** (`F`): calms the room, dims the interface, highlights your current note and pins your notes onto the wood.
 - **Personalization**: three wood themes, default note color, animation level (follows `prefers-reduced-motion`), optional sounds (off by default), English and Arabic (RTL), first weekday, date format, and daily reminders where the browser supports them.
 - **Your data stays local**: stored in IndexedDB on your device. Export and import JSON backups with merge or replace. If storage is unavailable, the app falls back to in-memory storage and tells you.

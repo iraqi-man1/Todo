@@ -134,3 +134,18 @@ describe('haptics', () => {
     expect(vibrate).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('stamp pressure', () => {
+  it('keeps how firmly the day was stamped, clamped to 0–1, and undoes cleanly', async () => {
+    const { uPin } = await import('@/domain/undoable')
+    const { setTaskCompleted } = await import('@/domain/actions')
+    const t = await addTask(D, { title: 'Walk' })
+    await setTaskCompleted(t.id, true)
+    const res = await uPin(D, { stampPressure: 1.4 })
+    expect(res.ok && res.archive.stampPressure).toBe(1)
+    await undo()
+    expect(await db.archives.count()).toBe(0)
+    const again = await uPin(D)
+    expect(again.ok && again.archive.stampPressure).toBeUndefined()
+  })
+})

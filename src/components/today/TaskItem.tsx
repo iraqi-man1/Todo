@@ -43,6 +43,7 @@ export const TaskItem = memo(function TaskItem(props: TaskItemProps) {
       style={style}
       className={cn('relative list-none', s.isDragging && 'z-10')}
       data-testid="task-item"
+      data-task-id={task.id}
     >
       <TaskRow {...props} dragging={s.isDragging} handleProps={props.editable && sortable ? { ...s.attributes, ...s.listeners } : undefined} />
     </li>

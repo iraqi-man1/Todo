@@ -2,7 +2,9 @@ import { toast } from 'sonner'
 import type { UndoLabel } from '@/domain/undoable'
 import { redo, undo, undoEntry, type HistoryEntry } from '@/store/history'
 import { usePrefs } from '@/store/prefs'
+import { currentMotionLevel } from '@/hooks/useMotionLevel'
 import { reportError } from './errors'
+import { untossIfTossed } from './toss'
 import { DICTS } from './i18n'
 
 const dict = () => DICTS[usePrefs.getState().prefs.language]
@@ -11,6 +13,7 @@ const labelOf = (e: HistoryEntry) => dict().history.labels[e.label as UndoLabel]
 export async function undoWithToast() {
   try {
     const e = await undo()
+    untossIfTossed(e, currentMotionLevel())
     if (e) toast(dict().history.undone.replace('{label}', labelOf(e)), { action: { label: dict().history.redo, onClick: () => void redoWithToast() } })
     else toast(dict().history.nothingUndo)
   } catch (err) {
@@ -32,6 +35,14 @@ export async function redoWithToast() {
 export function toastWithUndo(message: string, entry: HistoryEntry | null | undefined, description?: string) {
   toast(message, {
     description,
-    action: entry ? { label: dict().history.undo, onClick: () => void undoEntry(entry).catch(reportError) } : undefined,
+    action: entry
+      ? {
+          label: dict().history.undo,
+          onClick: () =>
+            void undoEntry(entry)
+              .then(() => untossIfTossed(entry, currentMotionLevel()))
+              .catch(reportError),
+        }
+      : undefined,
   })
 }

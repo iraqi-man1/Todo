@@ -28,6 +28,7 @@ export const en = {
     addPlaceholder: 'Add a task…',
     addTask: 'Add task',
     newNote: 'New note',
+    peelHint: 'Pull the corner up to peel off a new note, or click',
     noteTitlePlaceholder: 'Note title',
     untitledNote: 'Untitled note',
     deleteNote: 'Delete note',
@@ -93,6 +94,7 @@ export const en = {
   },
 
   celebrate: {
+    holdHint: 'Hold to press the stamp harder',
     title: 'Everything done!',
     body: 'Every task for {date} is complete. Pin it to your wall to keep the memory.',
     pin: 'Pin to My Wall',
@@ -143,6 +145,7 @@ export const en = {
   },
 
   detail: {
+    unpinFromWall: 'Take off the wall',
     completed: 'Completed',
     incomplete: 'Not completed',
     close: 'Close',

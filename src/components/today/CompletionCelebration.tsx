@@ -1,5 +1,6 @@
 import { Pin } from 'lucide-react'
-import { motion } from 'motion/react'
+import { animate, motion, useMotionValue, useTransform, type AnimationPlaybackControls } from 'motion/react'
+import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { useI18n } from '@/lib/i18n'
@@ -21,7 +22,8 @@ export function CompletionCelebration({
   busy: boolean
   /** Play confetti only when the day was just completed, not on every visit. */
   animated: boolean
-  onPin: () => void
+  /** pressure: how firmly the stamp was pressed (0–1), from how long the button was held. */
+  onPin: (pressure: number) => void
   onDismiss: () => void
 }) {
   const { d, f, date: fmt } = useI18n()
@@ -56,11 +58,58 @@ export function CompletionCelebration({
           <Button variant="ghost" onClick={onDismiss} className="flex-1 sm:flex-none">
             {d.celebrate.later}
           </Button>
-          <Button variant="primary" size="lg" onClick={onPin} disabled={busy} className="flex-[2] sm:flex-none">
-            <Pin /> {d.celebrate.pin}
-          </Button>
+          <StampButton busy={busy} level={level} onPin={onPin} label={d.celebrate.pin} hint={d.celebrate.holdHint} />
         </div>
       </div>
     </motion.div>
+  )
+}
+
+const HOLD_FULL = 900 // ms of holding for the firmest stamp
+
+/**
+ * "Pin to My Wall", pressed like a real stamp: a click gives an ordinary imprint, holding loads more
+ * ink (a ring fills around the button) for a darker, crisper one. Keyboard activation stamps normally.
+ */
+function StampButton({ busy, level, onPin, label, hint }: { busy: boolean; level: MotionLevel; onPin: (pressure: number) => void; label: string; hint: string }) {
+  const charge = useMotionValue(0)
+  const dash = useTransform(charge, (c) => 1 - c)
+  const press = useRef<{ start: number; anim: AnimationPlaybackControls } | null>(null)
+  const release = (cancel = false) => {
+    const p = press.current
+    press.current = null
+    if (!p) return
+    p.anim.stop()
+    const held = Math.min(1, (performance.now() - p.start) / HOLD_FULL)
+    void animate(charge, 0, { duration: level === 'off' ? 0 : 0.25 })
+    // a tap still stamps firmly enough; holding goes all the way
+    if (!cancel) onPin(0.55 + held * 0.45)
+  }
+  return (
+    <Button
+      variant="primary"
+      size="lg"
+      disabled={busy}
+      title={hint}
+      aria-description={hint}
+      className="relative flex-[2] overflow-hidden sm:flex-none"
+      onPointerDown={(e) => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return
+        e.currentTarget.setPointerCapture(e.pointerId)
+        press.current = { start: performance.now(), anim: animate(charge, 1, { duration: HOLD_FULL / 1000, ease: 'linear' }) }
+      }}
+      onPointerUp={() => release()}
+      onPointerCancel={() => release(true)}
+      onClick={(e) => {
+        // pointer presses are handled on release; this is keyboard Enter/Space
+        if (e.detail === 0) onPin(0.7)
+      }}
+    >
+      {/* the ink loading up as you hold: a ring drawn around the button's face */}
+      <svg aria-hidden className="pointer-events-none absolute inset-0 overflow-visible" style={{ width: '100%', height: '100%' }}>
+        <motion.rect x="0" y="0" width="100%" height="100%" rx="14" fill="none" stroke="rgb(255 248 235 / 0.95)" strokeWidth="7" pathLength={1} strokeDasharray="1 1" style={{ strokeDashoffset: dash }} />
+      </svg>
+      <Pin /> {label}
+    </Button>
   )
 }

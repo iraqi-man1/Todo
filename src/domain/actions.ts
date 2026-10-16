@@ -254,7 +254,7 @@ export type ArchiveResult =
  * Pin a fully-completed day to the wall. Idempotent: a second attempt returns the existing archive.
  * Runs in one transaction so concurrent taps can never create two snapshots.
  */
-export async function archiveDay(date: DateKey): Promise<ArchiveResult> {
+export async function archiveDay(date: DateKey, opts: { stampPressure?: number } = {}): Promise<ArchiveResult> {
   return db.transaction('rw', [db.archives, db.tasks, db.notes, db.days, db.categories], async () => {
     const existing = await db.archives.where('date').equals(date).first()
     if (existing) return { ok: true as const, archive: existing, created: false }
@@ -278,6 +278,7 @@ export async function archiveDay(date: DateKey): Promise<ArchiveResult> {
       title: meta?.title ?? '',
       personalNote: meta?.personalNote ?? '',
       mood: meta?.mood ?? null,
+      ...(opts.stampPressure !== undefined && { stampPressure: Math.max(0, Math.min(1, opts.stampPressure)) }),
       color: notes[0]?.color ?? 'yellow',
       notes: notes.map((n) => ({ id: n.id, title: n.title, color: n.color })),
       tasks: sorted.map((t) => {

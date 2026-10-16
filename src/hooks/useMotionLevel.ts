@@ -19,6 +19,15 @@ export function useMotionLevel(): MotionLevel {
   return 'full'
 }
 
+/** The same level outside React (event handlers, undo toasts). */
+export function currentMotionLevel(): MotionLevel {
+  const { intensity, reducedMotion } = usePrefs.getState().prefs
+  const system = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (intensity === 'off') return 'off'
+  if (reducedMotion === 'on' || (reducedMotion === 'system' && system) || intensity === 'subtle') return 'reduced'
+  return 'full'
+}
+
 export interface Effects {
   level: MotionLevel
   /** 1 = lively, 0.5 = subtle, 0 = none */

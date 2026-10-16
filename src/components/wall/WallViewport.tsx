@@ -1,5 +1,6 @@
-import { animate, motion, useMotionValue, type AnimationPlaybackControls, type MotionValue } from 'motion/react'
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import { animate, motion, useMotionValue, useVelocity, type AnimationPlaybackControls, type MotionValue } from 'motion/react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react'
+import { WallSwingContext } from './drag'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { clamp, cn } from '@/lib/utils'
 
@@ -70,6 +71,11 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
   const x = useMotionValue(0)
   const y = useMotionValue(0)
   const s = useMotionValue(1)
+  // shared with pinned notes so they swing when the wall moves (one velocity tracker for all)
+  const vx = useVelocity(x)
+  const vy = useVelocity(y)
+  const vs = useVelocity(s)
+  const swing = useMemo(() => ({ vx, vy, vs }), [vx, vy, vs])
   const anims = useRef<AnimationPlaybackControls[]>([])
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const gesture = useRef<{
@@ -409,7 +415,7 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
       }}
     >
       <motion.div ref={inner} className="absolute top-0 left-0 w-max will-change-transform" style={{ x, y, scale: s, originX: 0, originY: 0 }}>
-        {children}
+        <WallSwingContext.Provider value={swing}>{children}</WallSwingContext.Provider>
       </motion.div>
       {overlay && (
         <div className="pointer-events-none absolute inset-0" onPointerDown={(e) => e.stopPropagation()}>

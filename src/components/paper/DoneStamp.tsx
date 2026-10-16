@@ -1,5 +1,33 @@
+import { useId, useMemo } from 'react'
 import type { StampStyle } from '@/domain/types'
 import { cn } from '@/lib/utils'
+
+function rng(seed: string) {
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619)
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507)
+    h = Math.imul(h ^ (h >>> 13), 3266489909)
+    return ((h ^= h >>> 16) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * What one particular press left on the paper: ink gaps (more when pressed lightly), one side
+ * inkier than the other, and now and then a faint double strike where the stamp slipped.
+ */
+function useImprint(seed: string | undefined, pressure: number) {
+  return useMemo(() => {
+    if (!seed) return null
+    const r = rng(seed)
+    const gaps = Math.round(8 + (1 - pressure) * 34)
+    const specks = Array.from({ length: gaps }, () => ({ x: r() * 100, y: r() * 100, r: 0.5 + r() * (1.2 + (1 - pressure) * 1.8) }))
+    const angle = r() * 360
+    const fade = 0.15 + (1 - pressure) * 0.5
+    const slip = r() < 0.28 ? { x: (r() - 0.5) * 3, y: (r() - 0.5) * 3 } : null
+    return { specks, angle, fade, slip }
+  }, [seed, pressure])
+}
 
 const INK: Record<StampStyle, string> = {
   classic: '#3F7A4C',
@@ -34,6 +62,8 @@ export function DoneStamp({
   className,
   onPaper = true,
   variant = 'classic',
+  seed,
+  pressure = 0.7,
 }: {
   label?: string
   sub?: string
@@ -44,8 +74,15 @@ export function DoneStamp({
   /** Ink soaks into paper (multiply); on dark UI surfaces draw it plainly so it stays visible. */
   onPaper?: boolean
   variant?: StampStyle
+  /** Makes this imprint unique (e.g. the date): ink gaps, uneven inking, an occasional slip. */
+  seed?: string
+  /** 0–1: a firmer press is darker, crisper and has fewer gaps. */
+  pressure?: number
 }) {
   const color = ink ?? INK[variant]
+  const uid = useId().replace(/:/g, '')
+  const imprint = useImprint(seed, pressure)
+  const p = Math.max(0, Math.min(1, pressure))
   const small = label.length > 6
   const text = (
     <text
@@ -69,8 +106,31 @@ export function DoneStamp({
       width={size}
       height={size}
       className={cn('pointer-events-none select-none', className)}
-      style={{ transform: `rotate(${rotate}deg)`, color, opacity: onPaper ? 0.82 : 0.95, mixBlendMode: onPaper ? 'multiply' : 'normal' }}
+      style={{
+        transform: `rotate(${rotate}deg)`,
+        color,
+        opacity: onPaper ? (imprint ? 0.6 + p * 0.34 : 0.82) : 0.95,
+        mixBlendMode: onPaper ? 'multiply' : 'normal',
+      }}
     >
+      {imprint && (
+        <defs>
+          <linearGradient id={`${uid}-ink`} gradientTransform={`rotate(${imprint.angle} 0.5 0.5)`}>
+            <stop offset="0" stopColor="#fff" />
+            <stop offset="1" stopColor="#fff" stopOpacity={1 - imprint.fade} />
+          </linearGradient>
+          <mask id={`${uid}-m`} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+            <rect width="100" height="100" fill={`url(#${uid}-ink)`} />
+            {imprint.specks.map((k, i) => (
+              <circle key={i} cx={k.x} cy={k.y} r={k.r} fill="#000" />
+            ))}
+          </mask>
+        </defs>
+      )}
+      {imprint?.slip && (
+        <use href={`#${uid}-face`} x={imprint.slip.x} y={imprint.slip.y} opacity={0.18} />
+      )}
+      <g id={`${uid}-face`} mask={imprint ? `url(#${uid}-m)` : undefined}>
       {variant === 'heart' ? (
         <>
           <path d="M50 92 C18 70 6 52 6 34 A20 20 0 0 1 50 22 A20 20 0 0 1 94 34 C94 52 82 70 50 92Z" fill="none" stroke="currentColor" strokeWidth="5" strokeDasharray="70 3 40 2 90 4" strokeLinejoin="round" />
@@ -110,6 +170,7 @@ export function DoneStamp({
           {sub}
         </text>
       )}
+      </g>
     </svg>
   )
 }

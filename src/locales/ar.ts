@@ -30,6 +30,7 @@ export const ar: Dict = {
     addPlaceholder: 'أضف مهمة…',
     addTask: 'إضافة مهمة',
     newNote: 'ورقة جديدة',
+    peelHint: 'اسحب الزاوية لفوق حتى تقشّر ورقة جديدة، أو اضغط',
     noteTitlePlaceholder: 'عنوان الورقة',
     untitledNote: 'ورقة بلا عنوان',
     deleteNote: 'حذف الورقة',
@@ -95,6 +96,7 @@ export const ar: Dict = {
   },
 
   celebrate: {
+    holdHint: 'اضغط مطوّلاً حتى ينطبع الختم أغمق',
     title: 'أنجزت كل شيء!',
     body: 'اكتملت جميع مهام {date}. علّقها على جدارك لتحتفظ بالذكرى.',
     pin: 'علّق على جداري',
@@ -145,6 +147,7 @@ export const ar: Dict = {
   },
 
   detail: {
+    unpinFromWall: 'شيلها من الجدار',
     completed: 'مكتملة',
     incomplete: 'غير مكتملة',
     close: 'إغلاق',

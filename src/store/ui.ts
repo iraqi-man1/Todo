@@ -63,6 +63,9 @@ interface UIState {
   closeEditor: () => void
 
   inspect: InspectState | null
+  /** A wall note whose pin is being pulled out (plays the fall, then unpins). */
+  unpinning: DateKey | null
+  setUnpinning: (d: DateKey | null) => void
   setInspect: (i: InspectState | null) => void
 
   shortcutsOpen: boolean
@@ -112,6 +115,8 @@ export const useUI = create<UIState>((set) => ({
   closeEditor: () => set({ editor: null }),
 
   inspect: null,
+  unpinning: null,
+  setUnpinning: (unpinning) => set({ unpinning }),
   setInspect: (inspect) => set({ inspect }),
 
   shortcutsOpen: false,
