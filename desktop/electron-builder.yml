@@ -1,0 +1,32 @@
+appId: app.donewall.desktop
+productName: DoneWall
+copyright: DoneWall
+directories:
+  output: release
+  buildResources: build
+files:
+  - main.cjs
+  - app/**/*
+  - build/icon.png
+  - package.json
+asar: true
+win:
+  # a single self-contained .exe; the installer (nsis) is built on Windows by the desktop workflow
+  target:
+    - target: portable
+      arch: [x64]
+  icon: build/icon.ico
+  # editing the .exe resources needs Wine on Linux; CI on Windows can turn this back on
+  signAndEditExecutable: false
+portable:
+  artifactName: DoneWall-${version}-portable.exe
+nsis:
+  artifactName: DoneWall-${version}-setup.exe
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DoneWall
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico

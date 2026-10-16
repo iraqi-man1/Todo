@@ -1,0 +1,508 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter Variable', 'Cairo Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-hand: 'Caveat', 'Cairo Variable', cursive;
+  --font-arabic: 'Cairo Variable', 'Inter Variable', sans-serif;
+
+  --color-ivory: #f8f5ef;
+  --color-cream: #fffdf8;
+  --color-oak: #c99b6b;
+  --color-oak-light: #d9b88f;
+  --color-walnut: #805b3d;
+  --color-charcoal: #302c28;
+  --color-muted-ink: #81786f;
+
+  --color-note-yellow: #fff0a8;
+  --color-note-pink: #f8c9ce;
+  --color-note-mint: #d4ebcb;
+  --color-note-lavender: #ddd4f8;
+  --color-note-peach: #ffd9bd;
+  --color-note-blue: #cfe5f5;
+
+  /* Semantic tokens (switch with theme) */
+  --color-bg: var(--dw-bg);
+  --color-surface: var(--dw-surface);
+  --color-surface-2: var(--dw-surface-2);
+  --color-ink: var(--dw-ink);
+  --color-ink-soft: var(--dw-ink-soft);
+  --color-line: var(--dw-line);
+  --color-accent: var(--dw-accent);
+  --color-accent-ink: var(--dw-accent-ink);
+  --color-success: var(--dw-success);
+  --color-danger: var(--dw-danger);
+
+  --radius-paper: 3px;
+  --shadow-soft: 0 1px 2px rgb(64 42 20 / 0.06), 0 4px 14px rgb(64 42 20 / 0.07);
+  --shadow-lift: 0 2px 4px rgb(64 42 20 / 0.08), 0 18px 40px rgb(64 42 20 / 0.16);
+
+  --ease-paper: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  --dw-bg: #f8f5ef;
+  --dw-surface: #fffdf8;
+  --dw-surface-2: #f2ece2;
+  --dw-ink: #302c28;
+  --dw-ink-soft: #776e65;
+  --dw-line: #e7dfd2;
+  --dw-accent: #805b3d;
+  --dw-accent-ink: #fffdf8;
+  --dw-success: #4f7a4a;
+  --dw-danger: #b4533f;
+  --dw-backdrop: #ece4d7;
+  --dw-chart: #b86e2e;
+  --paper-noise: none;
+  --wood-texture: none;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  color-scheme: light;
+}
+
+:root.dark {
+  --dw-bg: #1c1814;
+  --dw-surface: #26211c;
+  --dw-surface-2: #2f2923;
+  --dw-ink: #f1e9dd;
+  --dw-ink-soft: #b3a796;
+  --dw-line: #3a332b;
+  --dw-accent: #d9b88f;
+  --dw-accent-ink: #26211c;
+  --dw-success: #9cc58f;
+  --dw-danger: #e48f7a;
+  --dw-backdrop: #15120f;
+  --dw-chart: #c47d3a;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--dw-bg);
+  color: var(--dw-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+:root[lang='ar'] body {
+  font-family: var(--font-arabic);
+}
+
+:root[lang='ar'] .font-hand {
+  font-family: var(--font-arabic);
+  font-weight: 600;
+}
+
+::selection {
+  background: #fff0a8;
+  color: #302c28;
+}
+
+:focus-visible {
+  outline: 2px solid var(--dw-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Paper ---------- */
+.paper {
+  position: relative;
+  border-radius: var(--radius-paper);
+  background-color: var(--note-bg, #fff0a8);
+  background-image:
+    var(--paper-noise),
+    linear-gradient(180deg, rgb(0 0 0 / 0.035) 0, rgb(0 0 0 / 0) 13%),
+    linear-gradient(165deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0) 45%, rgb(0 0 0 / 0.04));
+  background-size:
+    160px 160px,
+    100% 100%,
+    100% 100%;
+  color: #302c28;
+  box-shadow:
+    0 1px 1px rgb(60 40 20 / 0.12),
+    0 3px 6px -2px rgb(60 40 20 / 0.18),
+    0 10px 18px -10px rgb(60 40 20 / 0.35);
+}
+
+/* curled bottom corner */
+.paper-curl::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  border-end-end-radius: var(--radius-paper);
+  background: linear-gradient(
+    315deg,
+    transparent 0 46%,
+    rgb(0 0 0 / 0.1) 50%,
+    rgb(255 255 255 / 0.55) 56%,
+    rgb(0 0 0 / 0.03) 100%
+  );
+  pointer-events: none;
+}
+
+:root[dir='rtl'] .paper-curl::after {
+  background: linear-gradient(
+    45deg,
+    transparent 0 46%,
+    rgb(0 0 0 / 0.1) 50%,
+    rgb(255 255 255 / 0.55) 56%,
+    rgb(0 0 0 / 0.03) 100%
+  );
+}
+
+/* the corner lifts off the surface: an elongated shadow beneath it */
+.paper-curl::before {
+  content: '';
+  position: absolute;
+  inset-inline-end: 6px;
+  bottom: 7px;
+  width: min(45%, 110px);
+  height: 16px;
+  z-index: -1;
+  background: rgb(40 25 10 / 0.42);
+  filter: blur(6px);
+  transform: rotate(4deg) skewX(25deg);
+  transform-origin: right bottom;
+  pointer-events: none;
+}
+
+.ruled {
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent 0 43px,
+    rgb(48 44 40 / 0.07) 43px 44px
+  );
+  background-position: 0 6px;
+}
+
+/* ---------- Wood ---------- */
+.wood {
+  background-color: var(--wood-base, #c99b6b);
+  background-image: var(--wood-texture);
+  background-size: 1024px 1024px;
+}
+
+.wood-frame {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.12),
+    inset 0 2px 0 rgb(255 255 255 / 0.18),
+    inset 0 -3px 6px rgb(0 0 0 / 0.25),
+    0 1px 2px rgb(0 0 0 / 0.2),
+    0 30px 60px -20px rgb(40 22 8 / 0.55);
+}
+
+.wall-backdrop {
+  background-color: var(--dw-backdrop);
+  background-image:
+    radial-gradient(ellipse at 30% 0%, rgb(255 240 210 / 0.35), transparent 60%),
+    var(--paper-noise);
+  background-size:
+    100% 100%,
+    220px 220px;
+}
+
+.engraved {
+  color: rgb(60 35 15 / 0.82);
+  text-shadow:
+    0 1px 0 rgb(255 235 205 / 0.35),
+    0 -1px 0 rgb(0 0 0 / 0.25);
+}
+
+.chalk {
+  color: rgb(255 248 235 / 0.72);
+  /* a dark halo keeps chalk legible on light wood, bright lamps and paper prints */
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.4), 0 0 6px rgb(40 22 10 / 0.35);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Dialog motion (CSS so Radix keeps control of mount/unmount) ---------- */
+@keyframes dw-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes dw-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes dw-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes dw-sheet-down {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes dw-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+}
+@keyframes dw-pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+.dw-overlay[data-state='open'] {
+  animation: dw-fade-in 0.22s ease-out;
+}
+.dw-overlay[data-state='closed'] {
+  animation: dw-fade-out 0.16s ease-in forwards;
+}
+.dw-sheet[data-state='open'] {
+  animation: dw-sheet-up 0.38s var(--ease-paper);
+}
+.dw-sheet[data-state='closed'] {
+  animation: dw-sheet-down 0.22s ease-in forwards;
+}
+@media (min-width: 640px) {
+  .dw-sheet[data-state='open'] {
+    animation: dw-pop 0.26s var(--ease-paper);
+  }
+  .dw-sheet[data-state='closed'] {
+    animation: dw-pop-out 0.14s ease-in forwards;
+  }
+}
+:root.motion-off *,
+:root.motion-off *::before,
+:root.motion-off *::after {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+:root.motion-reduced .dw-sheet[data-state] {
+  animation-name: dw-fade-in;
+}
+:root.motion-reduced .dw-sheet[data-state='closed'] {
+  animation-name: dw-fade-out;
+}
+
+/* ---------- Cozy Night ---------- */
+:root.night {
+  --dw-bg: #101827;
+  --dw-surface: rgb(25 37 55 / 0.86);
+  --dw-surface-2: rgb(38 52 75 / 0.85);
+  --dw-ink: #f5e7cf;
+  --dw-ink-soft: #b9ac97;
+  --dw-line: rgb(245 231 207 / 0.12);
+  --dw-accent: #e8ad67;
+  --dw-accent-ink: #1d1409;
+  --dw-success: #a6cf96;
+  --dw-danger: #f0a08a;
+  --dw-backdrop: transparent;
+  --dw-chart: #e0a35f;
+}
+
+:root.night body {
+  background: #101827;
+}
+
+/* Cards float in the room: translucent with a soft blur so the scene breathes through. */
+:root.night .bg-surface,
+:root.night .bg-surface\/90,
+:root.night .bg-surface\/85,
+:root.night .bg-surface\/80,
+:root.night .bg-surface\/60 {
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+/* Lamp light warms the paper; strength follows the lamp-brightness setting. */
+:root.night .paper {
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / 0.25),
+    0 4px 8px -2px rgb(0 0 0 / 0.35),
+    0 16px 26px -12px rgb(0 0 0 / 0.6);
+}
+:root.night .paper {
+  background-image:
+    radial-gradient(ellipse 120% 90% at 15% 0%, rgb(255 214 150 / calc(var(--lamp, 0) * 0.22)), transparent 70%),
+    linear-gradient(0deg, rgb(16 24 39 / calc(0.16 - var(--lamp, 0) * 0.12)), rgb(16 24 39 / calc(0.16 - var(--lamp, 0) * 0.12))),
+    var(--paper-noise),
+    linear-gradient(180deg, rgb(0 0 0 / 0.035) 0, rgb(0 0 0 / 0) 13%),
+    linear-gradient(165deg, rgb(255 255 255 / 0.35), rgb(255 255 255 / 0) 45%, rgb(0 0 0 / 0.05));
+  background-size:
+    100% 100%,
+    100% 100%,
+    160px 160px,
+    100% 100%,
+    100% 100%;
+}
+
+:root.night .wall-backdrop {
+  background: transparent;
+}
+
+@keyframes dw-clouds {
+  from {
+    transform: translateX(-30%);
+  }
+  to {
+    transform: translateX(30%);
+  }
+}
+@keyframes dw-twinkle {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes dw-flicker {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  42% {
+    opacity: 0.9;
+  }
+  46% {
+    opacity: 0.15;
+  }
+  60% {
+    opacity: 0.15;
+  }
+  64% {
+    opacity: 0.8;
+  }
+}
+.dw-flicker {
+  animation: dw-flicker 14s ease-in-out infinite;
+}
+@keyframes dw-lamp {
+  50% {
+    opacity: calc(var(--lamp) * 0.92);
+  }
+}
+.dw-clouds {
+  animation: dw-clouds 160s linear infinite alternate;
+}
+.dw-twinkle {
+  animation: dw-twinkle 6s ease-in-out infinite;
+}
+.dw-lamp-breathe {
+  animation: dw-lamp 9s ease-in-out infinite;
+}
+:root.still .dw-flicker,
+:root.motion-reduced .dw-flicker,
+:root.still .dw-clouds,
+:root.still .dw-twinkle,
+:root.still .dw-lamp-breathe,
+:root.motion-reduced .dw-clouds,
+:root.motion-reduced .dw-twinkle,
+:root.motion-reduced .dw-lamp-breathe {
+  animation: none;
+}
+
+/* ---------- Focus mode ---------- */
+:root.focus-mode [data-dim] {
+  opacity: 0.32;
+  transition: opacity 0.4s ease;
+}
+:root.focus-mode [data-dim]:hover,
+:root.focus-mode [data-dim]:focus-within {
+  opacity: 1;
+}
+:root.focus-mode [data-note-idle] {
+  opacity: 0.45;
+  filter: saturate(0.6);
+  transition:
+    opacity 0.4s ease,
+    filter 0.4s ease;
+}
+:root.focus-mode [data-note-idle]:hover,
+:root.focus-mode [data-note-idle]:focus-within {
+  opacity: 1;
+  filter: none;
+}
+
+/* ---------- Tooltips ---------- */
+@keyframes dw-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px) scale(0.98);
+  }
+}
+.dw-tip[data-state='delayed-open'],
+.dw-tip[data-state='instant-open'] {
+  animation: dw-tip-in 0.16s var(--ease-paper);
+}
+
+.dw-palette[data-state='open'] {
+  animation: dw-pop 0.22s var(--ease-paper);
+}
+.dw-palette[data-state='closed'] {
+  animation: dw-pop-out 0.12s ease-in forwards;
+}
+
+:root.app-hidden *,
+:root.app-hidden *::before,
+:root.app-hidden *::after {
+  animation-play-state: paused !important;
+}
+
+/* Print the wall: only the poster sheet goes to paper. Off-screen (not display:none) on screen so it can be measured. */
+.dw-print-sheet {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  pointer-events: none;
+}
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body > *:not(.dw-print-sheet) {
+    display: none !important;
+  }
+  .dw-print-sheet {
+    position: static;
+    left: auto;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .dw-print-sheet * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .dw-no-print {
+    display: none !important;
+  }
+}

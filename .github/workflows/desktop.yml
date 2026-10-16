@@ -1,0 +1,32 @@
+# Builds the Windows desktop app (installer + portable .exe) on a Windows runner. The same
+# `npm run build:win` also works on Linux and macOS (no Wine needed).
+# Manual only (Actions → "Desktop (Windows)" → Run workflow) or on a version tag, so it never
+# runs on ordinary pushes or pull requests.
+name: Desktop (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-audit --no-fund
+        working-directory: desktop
+      - name: Build installer and portable exe
+        working-directory: desktop
+        run: npm run build:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DoneWall-windows
+          path: |
+            desktop/release/*.exe
+          if-no-files-found: error
