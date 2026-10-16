@@ -1,12 +1,18 @@
 # Builds the Windows desktop app (installer + portable .exe) on a Windows runner. The same
 # `npm run build:win` also works on Linux and macOS (no Wine needed).
 # Runs only manually (Actions → "Desktop (Windows)" → Run workflow) or on a version tag, so it
-# never runs on ordinary pushes or pull requests. A version tag (e.g. v1.0.1) also publishes a
-# GitHub Release with both .exe files attached.
+# never runs on ordinary pushes or pull requests. Pushing a version tag (e.g. v1.0.1), or running
+# it manually with a version, publishes a GitHub Release with both .exe files attached (the
+# release step creates the tag when it doesn't exist yet).
 name: Desktop (Windows)
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Publish a release with this tag (e.g. v1.0.1); leave empty to only build'
+        required: false
+        default: ''
   push:
     tags: ['v*']
 
@@ -37,10 +43,12 @@ jobs:
           path: desktop/release/*.exe
           if-no-files-found: error
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.version != ''
         uses: softprops/action-gh-release@v2
         with:
-          name: DoneWall ${{ github.ref_name }}
+          tag_name: ${{ inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: DoneWall ${{ inputs.version || github.ref_name }}
           files: desktop/release/*.exe
           fail_on_unmatched_files: true
           body: |
