@@ -10,10 +10,13 @@
   "scripts": {
     "app": "node prepare.cjs",
     "start": "npm run app && electron .",
-    "build:win": "npm run app && electron-builder --win --x64"
+    "build:win": "node scripts/build-setup.cjs",
+    "build:portable": "npm run app && electron-builder --win portable --x64"
   },
   "devDependencies": {
     "electron": "44.8.0",
-    "electron-builder": "26.15.3"
+    "electron-builder": "26.15.3",
+    "pe-library": "^2.0.1",
+    "resedit": "^3.1.0"
   }
 }

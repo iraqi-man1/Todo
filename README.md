@@ -62,10 +62,14 @@ The `desktop/` folder wraps the same offline app in Electron. It has its own dep
 cd desktop
 npm install
 npm start            # run the desktop app
-npm run build:win    # build release/DoneWall-<version>-portable.exe
+npm run build:win    # release/DoneWall-<version>-setup.exe and -portable.exe
 ```
 
-The app is served from a private `app://` scheme, so IndexedDB keeps your data between launches (in `%APPDATA%\DoneWall`). Links to websites open in your browser. Only one window can be open at a time. Building on Linux skips editing the .exe's icon and version info, which needs Wine. The **Desktop (Windows)** GitHub workflow (run it manually, or push a `v*` tag) builds the installer and the portable exe on Windows, with the icon embedded.
+- **Setup:** a per-user installer (no administrator prompt), in English or Arabic. It adds Start menu and desktop shortcuts and an entry in Windows' "Installed apps" with an uninstaller.
+- **Portable:** a single .exe that runs without installing.
+- **Data:** stays in `%APPDATA%\DoneWall` (IndexedDB, served from a private `app://` scheme), so updating or reinstalling keeps your notes.
+- **How it builds anywhere:** `scripts/brand-exe.cjs` writes the DoneWall icon and version info into `DoneWall.exe` with `resedit`, and `installer/installer.nsi` is compiled with `makensis`. Neither needs Wine, so the build runs on Linux, macOS or Windows. The **Desktop (Windows)** workflow runs it on GitHub when started manually or by a `v*` tag.
+- **Signing:** the executables aren't code-signed, so SmartScreen asks once ("More info" → "Run anyway").
 
 ## Architecture
 

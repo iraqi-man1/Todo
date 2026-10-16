@@ -1,4 +1,5 @@
-# Builds the Windows desktop app (installer + portable .exe) on a real Windows runner.
+# Builds the Windows desktop app (installer + portable .exe) on a Windows runner. The same
+# `npm run build:win` also works on Linux and macOS (no Wine needed).
 # Manual only (Actions → "Desktop (Windows)" → Run workflow) or on a version tag, so it never
 # runs on ordinary pushes or pull requests.
 name: Desktop (Windows)
@@ -22,8 +23,7 @@ jobs:
         working-directory: desktop
       - name: Build installer and portable exe
         working-directory: desktop
-        # on Windows the exe resources (icon, version info) can be written, so turn that back on
-        run: npm run app && npx electron-builder --win nsis portable --x64 -c.win.signAndEditExecutable=true --publish never
+        run: npm run build:win
       - uses: actions/upload-artifact@v4
         with:
           name: DoneWall-windows
