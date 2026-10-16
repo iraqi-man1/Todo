@@ -21,6 +21,7 @@ import {
   updateTask,
   type TaskInput,
 } from './actions'
+import { insertFromShelf } from './shelf'
 import type { DateKey, DayNote, NoteColor, Task } from './types'
 
 export type UndoLabel =
@@ -35,6 +36,7 @@ export type UndoLabel =
   | 'dayUnpinned'
   | 'dayPinned'
   | 'noteMoved'
+  | 'shelfInserted'
 
 function taskEntry(label: UndoLabel, id: string, before: Task | undefined, after: Task | undefined): HistoryEntry {
   const e = { label, undo: () => applyTaskSnapshot(id, before), redo: () => applyTaskSnapshot(id, after) }
@@ -123,4 +125,20 @@ export async function uSetSubtask(taskId: string, subId: string, done: boolean) 
   await setSubtaskDone(taskId, subId, done)
   const after = await db.tasks.get(taskId)
   return taskEntry(after?.completed && !before?.completed ? 'taskCompleted' : 'taskEdited', taskId, before, after)
+}
+
+/** Add Task Shelf templates to a day as one undoable step. */
+export async function uInsertFromShelf(date: DateKey, ids: string[], opts: { noteId?: string | null } = {}) {
+  const res = await insertFromShelf(date, ids, opts)
+  if (res.added.length) {
+    const added = res.added
+    record({
+      label: 'shelfInserted',
+      undo: async () => {
+        for (const t of added) await applyTaskSnapshot(t.id, undefined)
+      },
+      redo: () => applyTaskSnapshots(added),
+    })
+  }
+  return res
 }

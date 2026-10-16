@@ -1,3 +1,4 @@
+import { TaskShelfHost } from '@/components/shelf/TaskShelf'
 import { AnimatePresence, motion } from 'motion/react'
 import { lazy, Suspense, useEffect } from 'react'
 import { ArchivedNoteModal } from '@/components/wall/ArchivedNoteModal'
@@ -75,6 +76,7 @@ export function AppShell() {
       </main>
       <BottomNavigation />
       <TaskEditor />
+      <TaskShelfHost />
       <ArchivedNoteModal />
       <ShortcutsDialog />
       <CommandPalette />

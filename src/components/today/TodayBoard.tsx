@@ -1,3 +1,4 @@
+import { ShelfButton } from '@/components/shelf/ShelfButton'
 import { ArrowRightToLine, CalendarDays, ChevronLeft, ChevronRight, NotebookPen, Pin, PinOff, Plus, Search } from 'lucide-react'
 import { Tip } from '@/components/ui/tooltip'
 import { Board } from '@/components/wall/Board'
@@ -362,7 +363,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
             )}
           </AnimatePresence>
           {day.notes.length === 0 ? (
-            <EmptyDay editable={editable} onStart={ensureFirstNote} />
+            <EmptyDay editable={editable} date={date} onStart={ensureFirstNote} />
           ) : (
             <FocusSurface on={focus}>
             <div className={cn('grid gap-5', day.notes.length > 1 && 'md:grid-cols-2')}>
@@ -467,7 +468,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
   )
 }
 
-function EmptyDay({ editable, onStart }: { editable: boolean; onStart: () => void }) {
+function EmptyDay({ editable, date, onStart }: { editable: boolean; date: string; onStart: () => void }) {
   const { d } = useI18n()
   const prefs = usePrefs((s) => s.prefs)
   return (
@@ -475,14 +476,17 @@ function EmptyDay({ editable, onStart }: { editable: boolean; onStart: () => voi
       <p className="font-hand text-[34px] leading-none">{d.today.emptyTitle}</p>
       <p className="mx-auto mt-3 max-w-sm text-[15px] leading-relaxed text-[#302c28]/70">{d.today.emptyBody}</p>
       {editable && (
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
         <button
           type="button"
           onClick={onStart}
           data-start-day
-          className="mx-auto mt-6 flex h-12 items-center gap-2 rounded-full bg-[#302c28] px-6 text-[15px] font-medium text-[#fffdf8] shadow-soft transition active:scale-[0.97]"
+          className="flex h-12 items-center gap-2 rounded-full bg-[#302c28] px-6 text-[15px] font-medium text-[#fffdf8] shadow-soft transition active:scale-[0.97]"
         >
           <Plus className="size-5" /> {d.today.addTask}
         </button>
+        <ShelfButton date={date} noteId={null} labelled />
+        </div>
       )}
     </Paper>
   )

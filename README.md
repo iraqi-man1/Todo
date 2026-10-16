@@ -29,6 +29,7 @@ DoneWall is a cozy, offline-first to-do app. Plan your day on sticky notes; when
 - **Year heatmap**: switch the Year view between pinned notes and a heatmap in wood tones, darker for days you finished. Pinned days carry a brass dot.
 - **Settings search**: a search field and section shortcuts at the top of Settings.
 - **Haptics**: a light vibration on supported phones when you check a task, finish the day or pin a note (can be turned off).
+- **Task Shelf**: a personal library of reusable tasks, opened with the bookmark beside any note's "Add a task" field (or "From Task Shelf" on an empty day). Search instantly, save new tasks, tick several and add them together, or tap + to add one. Saved tasks can be renamed, deleted (with confirmation and undo) and reordered, and sorted by your own order or by recent use. Save any existing task with its bookmark. Added tasks are independent, incomplete copies: completing or editing them never touches the template or other days, and a task already on the note isn't added twice. Nothing repeats on its own. The shelf works offline and is included in backups.
 - **Focus Mode** (`F`): calms the room, dims the interface, highlights your current note and pins your notes onto the wood.
 - **Personalization**: three wood themes, default note color, animation level (follows `prefers-reduced-motion`), optional sounds (off by default), English and Arabic (RTL), first weekday, date format, and daily reminders where the browser supports them.
 - **Your data stays local**: stored in IndexedDB on your device. Export and import JSON backups with merge or replace. If storage is unavailable, the app falls back to in-memory storage and tells you.
@@ -50,7 +51,7 @@ npm run preview
 
 | Path | Purpose |
 | --- | --- |
-| `src/domain` | Pure business logic: types, summaries, stats and streaks, achievements, actions (Dexie mutations), backup |
+| `src/domain` | Pure business logic: types, summaries, stats and streaks, achievements, actions (Dexie mutations), the Task Shelf, backup |
 | `src/db` | Dexie schema (versioned for migrations) and storage fallback |
 | `src/store` | Zustand: UI state (routing, wall view, editor) and the preferences mirror |
 | `src/hooks` | Live queries, date rollover at midnight, motion level, shortcuts, reminders, ambience |

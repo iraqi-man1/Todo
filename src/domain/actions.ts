@@ -510,10 +510,10 @@ export function nextNoteColor(used: NoteColor[], preferred: NoteColor): NoteColo
 export async function clearAllData() {
   await db.transaction(
     'rw',
-    [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers, db.goals],
+    [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers, db.goals, db.shelf],
     async () => {
       await Promise.all(
-        [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers, db.goals].map(
+        [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers, db.goals, db.shelf].map(
           (t) => t.clear(),
         ),
       )

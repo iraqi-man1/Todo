@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo } from 'react'
 import { db } from '@/db/db'
 import { buildDaySummaries, type DaySummary } from '@/domain/summary'
-import { MOODS, type Archive, type DateKey, type Mood } from '@/domain/types'
+import { MOODS, type Archive, type DateKey, type Mood, type ShelfItem } from '@/domain/types'
 
 export function useDay(date: DateKey) {
   const data = useLiveQuery(async () => {
@@ -51,4 +51,9 @@ export function useGoals() {
 export function useMoods(): Map<DateKey, Mood> {
   const rows = useLiveQuery(() => db.days.filter((d) => !!d.mood && (MOODS as readonly string[]).includes(d.mood)).toArray(), [])
   return useMemo(() => new Map((rows ?? []).map((r) => [r.date, r.mood as Mood])), [rows])
+}
+
+/** Task Shelf templates in manual order. */
+export function useShelf(): ShelfItem[] | undefined {
+  return useLiveQuery(() => db.shelf.orderBy('order').toArray(), [])
 }

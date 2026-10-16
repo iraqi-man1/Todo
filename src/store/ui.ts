@@ -72,6 +72,9 @@ interface UIState {
   sidebarCollapsed: boolean
   hideCompleted: boolean
   setHideCompleted: (v: boolean) => void
+  /** The open Task Shelf and the day/note it adds to (noteId null: the day has no note yet). */
+  shelf: { date: string; noteId: string | null } | null
+  setShelf: (s: { date: string; noteId: string | null } | null) => void
   paletteOpen: boolean
   setPaletteOpen: (v: boolean) => void
   toggleSidebar: () => void
@@ -116,6 +119,8 @@ export const useUI = create<UIState>((set) => ({
   searchOpen: false,
   setSearchOpen: (searchOpen) => set({ searchOpen }),
   sidebarCollapsed: readCollapsed(),
+  shelf: null,
+  setShelf: (shelf) => set({ shelf }),
   hideCompleted: readFlag('dw-hide-done'),
   setHideCompleted: (hideCompleted) => {
     writeFlag('dw-hide-done', hideCompleted)

@@ -11,6 +11,7 @@ import type {
   Task,
   Wallpaper,
   Goal,
+  ShelfItem,
 } from '@/domain/types'
 
 export class DoneWallDB extends Dexie {
@@ -25,6 +26,7 @@ export class DoneWallDB extends Dexie {
   prefs!: Table<Prefs, string>
   wallpapers!: Table<Wallpaper, string>
   goals!: Table<Goal, string>
+  shelf!: Table<ShelfItem, string>
 
   constructor(name = 'donewall', deps?: { indexedDB: IDBFactory; IDBKeyRange: typeof IDBKeyRange }) {
     super(name, deps)
@@ -48,6 +50,10 @@ export class DoneWallDB extends Dexie {
     this.version(3).stores({
       tasks: 'id, date, noteId, recurrenceId, updatedAt, goalId',
       goals: 'id, createdAt',
+    })
+    // v4: the Task Shelf, reusable task templates kept apart from daily tasks. Additive.
+    this.version(4).stores({
+      shelf: 'id, order, lastUsedAt',
     })
   }
 }

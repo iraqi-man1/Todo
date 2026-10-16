@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, Clock, Flag, GripVertical, ListChecks, MoreHorizontal, Pencil, Repeat, Target, Trash2, Undo2 } from 'lucide-react'
+import { Bookmark, BookmarkCheck, ChevronDown, Clock, Flag, GripVertical, ListChecks, MoreHorizontal, Pencil, Repeat, Target, Trash2, Undo2 } from 'lucide-react'
 import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
 import { memo, useRef, useState } from 'react'
 import { HandCheck } from '@/components/paper/HandCheck'
@@ -28,6 +28,9 @@ export interface TaskItemProps {
   onSubtask?: (task: Task, subId: string, done: boolean) => void
   goal?: Goal
   onDelete: (task: Task) => void
+  /** Whether a task with this title is on the Task Shelf. */
+  saved?: boolean
+  onSaveToShelf?: (task: Task) => void
 }
 
 export const TaskItem = memo(function TaskItem(props: TaskItemProps) {
@@ -57,6 +60,8 @@ function TaskRow({
   onSubtask,
   goal,
   onDelete,
+  saved,
+  onSaveToShelf,
   dragging,
   handleProps,
 }: TaskItemProps & { dragging: boolean; handleProps?: Record<string, unknown> }) {
@@ -260,6 +265,9 @@ function TaskRow({
         </div>
         )}
 
+        {onSaveToShelf && (
+          <ShelfMark saved={!!saved} level={level} title={task.title} onSave={() => onSaveToShelf(task)} />
+        )}
         {editable && (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -272,6 +280,11 @@ function TaskRow({
               <DropdownMenuItem onSelect={() => onEdit(task)}>
                 <Pencil /> {d.task.editDetails}
               </DropdownMenuItem>
+              {onSaveToShelf && (
+                <DropdownMenuItem onSelect={() => onSaveToShelf(task)} disabled={saved}>
+                  {saved ? <BookmarkCheck /> : <Bookmark />} {saved ? d.shelf.savedTask : d.shelf.saveTask}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem danger onSelect={() => onDelete(task)}>
                 <Trash2 /> {d.task.delete}
               </DropdownMenuItem>
@@ -389,5 +402,52 @@ function InlineTitle({ initial, onSave, onCancel, onDetails }: { initial: string
       />
       <span className="mt-1 block px-0.5 text-[11px] text-[#302c28]/55">{d.task.inlineHint}</span>
     </div>
+  )
+}
+
+/**
+ * Bookmark beside a task: appears on hover (always on touch), fills in once the title is on the
+ * Task Shelf, and pops with a little ribbon drop when you save it.
+ */
+function ShelfMark({ saved, level, title, onSave }: { saved: boolean; level: MotionLevel; title: string; onSave: () => void }) {
+  const { d } = useI18n()
+  const [pop, setPop] = useState(0)
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (!saved) setPop((p) => p + 1)
+        onSave()
+      }}
+      aria-label={`${saved ? d.shelf.savedTask : d.shelf.saveTask}: ${title}`}
+      aria-pressed={saved}
+      className={cn(
+        'relative mt-0.5 grid size-9 shrink-0 place-items-center rounded-full transition-[opacity,color] hover:bg-black/5 focus-visible:opacity-100',
+        saved ? 'text-[#8C5A2E]/80 hover:text-[#8C5A2E]' : 'text-[#302c28]/40 hover:text-[#302c28]/80',
+        // saved tasks keep a quiet mark on touch screens; on desktop both appear on hover
+        saved ? 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100 max-sm:opacity-60',
+        pop > 0 && 'opacity-100',
+      )}
+    >
+      <motion.span
+        key={pop}
+        className="grid place-items-center"
+        initial={pop && level !== 'off' ? { scale: 0.6, rotate: -12 } : false}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={level === 'full' ? { type: 'spring', stiffness: 520, damping: 13 } : { duration: 0.15 }}
+      >
+        <Bookmark className="size-4" fill={saved ? 'currentColor' : 'none'} />
+      </motion.span>
+      {pop > 0 && level === 'full' && (
+        <motion.span
+          key={`r${pop}`}
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 left-1/2 h-3 w-1.5 -translate-x-1/2 rounded-b-[1px] bg-[#C4553F]"
+          initial={{ y: -2, opacity: 1, scaleY: 0.3 }}
+          animate={{ y: 10, opacity: 0, scaleY: 1 }}
+          transition={{ duration: 0.55, ease: 'easeOut' }}
+        />
+      )}
+    </button>
   )
 }

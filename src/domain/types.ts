@@ -94,6 +94,22 @@ export interface Archive {
   mood?: Mood | null
 }
 
+/**
+ * A reusable task on the Task Shelf. A template only: adding it to a day copies the title into a new,
+ * independent task, so templates and daily tasks never affect each other.
+ */
+export interface ShelfItem {
+  id: string
+  title: string
+  /** Manual order on the shelf (ascending). */
+  order: number
+  /** Last time it was added to a day, for "recently used". */
+  lastUsedAt: number | null
+  useCount: number
+  createdAt: number
+  updatedAt: number
+}
+
 /** A bigger goal that daily tasks feed into. */
 export interface Goal {
   id: string

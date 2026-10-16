@@ -15,7 +15,7 @@ import { DoneStamp } from '@/components/paper/DoneStamp'
 import { PaperPhysics } from '@/components/paper/PaperPhysics'
 import { useEffects } from '@/hooks/useMotionLevel'
 import { useCollection } from '@/hooks/useCollection'
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Paper } from '@/components/paper/StickyNote'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import {
@@ -34,6 +34,10 @@ import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { parseQuickAdd } from '@/lib/quickAdd'
+import { ShelfButton } from '@/components/shelf/ShelfButton'
+import { addShelfItem, shelfKey } from '@/domain/shelf'
+import { useShelf } from '@/hooks/useData'
+import { haptic } from '@/lib/haptics'
 import { addDaysKey } from '@/lib/dates'
 import { useToday } from '@/hooks/useToday'
 import { toast } from 'sonner'
@@ -67,6 +71,22 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
   const { d, f } = useI18n()
   const fx = useEffects()
   const collection = useCollection()
+  const shelf = useShelf()
+  const shelfKeys = useMemo(() => new Set((shelf ?? []).map((i) => shelfKey(i.title))), [shelf])
+  const saveToShelf = useCallback(
+    async (t: Task) => {
+      try {
+        const { created } = await addShelfItem(t.title)
+        if (created) {
+          haptic('tap')
+          toast.success(d.shelf.saved, { duration: 1600 })
+        } else toast(d.shelf.alreadySaved, { duration: 1600 })
+      } catch (e) {
+        onError(e)
+      }
+    },
+    [d, onError],
+  )
   const openEditor = useUI((s) => s.openEditor)
   const hideCompleted = useUI((s) => s.hideCompleted)
   const setHideCompleted = useUI((s) => s.setHideCompleted)
@@ -241,6 +261,8 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
                   onSubtask={(task, subId, done) => uSetSubtask(task.id, subId, done).catch(onError)}
                   goal={t.goalId ? goals.get(t.goalId) : undefined}
                   onDelete={onDelete}
+                  saved={shelfKeys.has(shelfKey(t.title))}
+                  onSaveToShelf={saveToShelf}
                 />
               ))}
             </ul>
@@ -327,8 +349,9 @@ const AddTaskInput = forwardRef<HTMLInputElement, { noteId: string; date: string
           title={d.quickAdd.hint}
           enterKeyHint="done"
           maxLength={200}
-          className="h-11 min-w-0 flex-1 bg-transparent text-[15px] text-[#302c28] placeholder:text-[#302c28]/45 focus:outline-none"
+          className="h-11 w-0 min-w-0 flex-1 bg-transparent text-[15px] text-[#302c28] placeholder:text-[#302c28]/45 focus:outline-none"
         />
+        <ShelfButton date={date} noteId={noteId} />
         <button
           type="button"
           onClick={() => {
