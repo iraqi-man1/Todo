@@ -1,5 +1,5 @@
 // DoneWall for Windows: a thin Electron shell around the same offline web app.
-const { app, BrowserWindow, Menu, net, protocol, shell } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain, net, protocol, shell } = require('electron')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 
@@ -15,6 +15,7 @@ protocol.registerSchemesAsPrivileged([
 if (!app.requestSingleInstanceLock()) app.quit()
 
 let win = null
+const TITLEBAR = 32
 
 function createWindow() {
   win = new BrowserWindow({
@@ -27,7 +28,17 @@ function createWindow() {
     autoHideMenuBar: true,
     show: false,
     icon: path.join(__dirname, 'build', 'icon.png'),
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: true },
+    // no native title bar or frame: the app's own background runs to the top edge, and Windows'
+    // min / max / close buttons are overlaid in the app's colours (see preload.cjs)
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#152034', symbolColor: '#f1e6d4', height: TITLEBAR },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: true,
+      preload: path.join(__dirname, 'preload.cjs'),
+    },
   })
   win.once('ready-to-show', () => win.show())
   // links to other sites open in the normal browser, never inside the app
@@ -43,6 +54,17 @@ function createWindow() {
   })
   void win.loadURL('app://donewall/index.html')
 }
+
+// the page reports its theme colours so the window controls blend in
+ipcMain.on('titlebar', (e, c) => {
+  const w = BrowserWindow.fromWebContents(e.sender)
+  if (!w || typeof c?.color !== 'string' || typeof c?.symbolColor !== 'string') return
+  try {
+    w.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: TITLEBAR })
+  } catch {
+    // platforms without an overlay simply ignore it
+  }
+})
 
 app.on('second-instance', () => {
   if (!win) return
