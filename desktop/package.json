@@ -1,0 +1,19 @@
+{
+  "name": "donewall-desktop",
+  "productName": "DoneWall",
+  "version": "1.0.0",
+  "description": "Make every day worth remembering. A cozy to-do app with a wooden achievement wall.",
+  "author": "DoneWall",
+  "license": "MIT",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "app": "node prepare.cjs",
+    "start": "npm run app && electron .",
+    "build:win": "npm run app && electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "44.8.0",
+    "electron-builder": "26.15.3"
+  }
+}

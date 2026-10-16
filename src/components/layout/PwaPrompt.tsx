@@ -9,7 +9,8 @@ import { useI18n } from '@/lib/i18n'
 export function PwaPrompt() {
   const { d } = useI18n()
   useEffect(() => {
-    if (import.meta.env.DEV || !('serviceWorker' in navigator)) return
+    // the Windows app ships its files locally, so it needs no service worker or update prompt
+    if (import.meta.env.DEV || !('serviceWorker' in navigator) || navigator.userAgent.includes('Electron')) return
     let cancelled = false
     void import('virtual:pwa-register').then(({ registerSW }) => {
       if (cancelled) return

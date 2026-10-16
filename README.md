@@ -54,6 +54,19 @@ npm run preview
 
 `node scripts/shots.mjs <outDir>` seeds sample history in the dev server and takes mobile and desktop screenshots (dev only).
 
+## Windows app
+
+The `desktop/` folder wraps the same offline app in Electron. It has its own dependencies, so the web app's are untouched.
+
+```bash
+cd desktop
+npm install
+npm start            # run the desktop app
+npm run build:win    # build release/DoneWall-<version>-portable.exe
+```
+
+The app is served from a private `app://` scheme, so IndexedDB keeps your data between launches (in `%APPDATA%\DoneWall`). Links to websites open in your browser. Only one window can be open at a time. Building on Linux skips editing the .exe's icon and version info, which needs Wine. The **Desktop (Windows)** GitHub workflow (run it manually, or push a `v*` tag) builds the installer and the portable exe on Windows, with the icon embedded.
+
 ## Architecture
 
 | Path | Purpose |
