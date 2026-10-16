@@ -1,13 +1,23 @@
 # Builds the Windows desktop app (installer + portable .exe) on a Windows runner. The same
 # `npm run build:win` also works on Linux and macOS (no Wine needed).
-# Manual only (Actions → "Desktop (Windows)" → Run workflow) or on a version tag, so it never
-# runs on ordinary pushes or pull requests.
+# Runs only manually (Actions → "Desktop (Windows)" → Run workflow) or on a version tag, so it
+# never runs on ordinary pushes or pull requests. Pushing a version tag (e.g. v1.0.1), or running
+# it manually with a version, publishes a GitHub Release with both .exe files attached (the
+# release step creates the tag when it doesn't exist yet).
 name: Desktop (Windows)
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Publish a release with this tag (e.g. v1.0.1); leave empty to only build'
+        required: false
+        default: ''
   push:
     tags: ['v*']
+
+permissions:
+  contents: write # needed to create the release and upload its files
 
 jobs:
   windows:
@@ -18,8 +28,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
       - run: npm ci
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
         working-directory: desktop
       - name: Build installer and portable exe
         working-directory: desktop
@@ -27,6 +40,30 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: DoneWall-windows
-          path: |
-            desktop/release/*.exe
+          path: desktop/release/*.exe
           if-no-files-found: error
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.version != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: DoneWall ${{ inputs.version || github.ref_name }}
+          files: desktop/release/*.exe
+          fail_on_unmatched_files: true
+          body: |
+            ## DoneWall for Windows (64-bit, Windows 10/11)
+
+            **Download one of these:**
+            - **DoneWall-*-setup.exe**: the installer. Adds Start menu and desktop shortcuts and an entry in "Installed apps". No administrator rights needed. Installing over an older version keeps your notes.
+            - **DoneWall-*-portable.exe**: a single file that runs without installing.
+
+            The first time you run it, Windows SmartScreen may warn that the app isn't recognised (it isn't code-signed). Choose **More info → Run anyway**.
+
+            ---
+
+            **نزّل واحد من هذني:**
+            - **setup.exe**: المثبّت. يسوي اختصارات بقائمة ابدأ وسطح المكتب، وما يحتاج صلاحيات مدير، وإذا نصّبته فوق نسخة قديمة ملاحظاتك تبقى.
+            - **portable.exe**: ملف واحد يشتغل بدون تنصيب.
+
+            أول مرة تشغّله، ويندوز ممكن يطلع تحذير SmartScreen لأن التطبيق مو موقّع. اضغط **More info** وبعدين **Run anyway**.
