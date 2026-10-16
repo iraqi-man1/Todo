@@ -1,4 +1,7 @@
-import { memo, useEffect, useMemo, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { WallpaperImage } from '@/components/wallpaper/WallpaperImage'
+import type { Wallpaper } from '@/domain/types'
+import { parallaxLayer, useParallax } from '@/hooks/useParallax'
 import { cn } from '@/lib/utils'
 
 function rng(seed: number) {
@@ -9,9 +12,7 @@ function rng(seed: number) {
 }
 
 /** The view outside: night sky, moon, slow clouds, a far city and tree line. Pure SVG, drawn once. */
-const layer = (depth: number): React.CSSProperties => ({
-  transform: `translate(calc(var(--px, 0) * ${depth}px), calc(var(--py, 0) * ${depth * 0.6}px))`,
-})
+const layer = parallaxLayer
 
 const NightScene = memo(function NightScene({ moonY = 120 }: { moonY?: number }) {
   const { stars, buildings, lights, far } = useMemo(() => {
@@ -249,17 +250,25 @@ export function NightWindow({
   rain,
   intensity,
   animate,
+  parallax = false,
+  scenery,
   framed = true,
   className,
 }: {
   rain: boolean
   intensity: number
   animate: boolean
+  /** Pointer parallax across the depth layers (sky, city, rain, glass); the frame stays put. */
+  parallax?: boolean
+  /** A custom wallpaper shown through the glass instead of the night scene. */
+  scenery?: Wallpaper | null
   framed?: boolean
   className?: string
 }) {
   const pane = useRef<HTMLDivElement>(null)
-  useParallax(pane, animate && framed)
+  useParallax(pane, parallax && framed)
+  const [broken, setBroken] = useState<string | null>(null)
+  const custom = scenery && broken !== scenery.id ? scenery : null
   return (
     <div
       className={cn('relative overflow-hidden', framed && 'rounded-[6px] p-[14px]', className)}
@@ -275,12 +284,22 @@ export function NightWindow({
       }
     >
       <div ref={pane} className={cn('relative h-full w-full overflow-hidden', framed && 'rounded-[2px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.5),inset_0_6px_14px_rgb(0_0_0/0.55)]')}>
-        <NightScene moonY={framed ? 120 : 330} />
-        {rain && <RainCanvas intensity={intensity} animate={animate} />}
-        {/* glass: faint reflection band + lamp reflected in the pane */}
+        {custom ? (
+          <WallpaperImage wallpaper={custom} settings={custom} parallaxDepth={10} onError={() => setBroken(custom.id)} />
+        ) : (
+          <NightScene moonY={framed ? 120 : 330} />
+        )}
+        {rain && (
+          // Drops sit on the glass, nearer than the scene: they drift a touch more.
+          <div className="absolute -inset-3" style={layer(11)}>
+            <RainCanvas intensity={intensity} animate={animate} />
+          </div>
+        )}
+        {/* glass: faint reflection band + lamp reflected in the pane; drifts slightly against the scene */}
         <div
-          className="absolute inset-0"
+          className="absolute -inset-2"
           style={{
+            ...layer(-3),
             background:
               'linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 0.05) 38%, transparent 46%), radial-gradient(ellipse 40% 25% at 18% 22%, rgb(232 173 103 / calc(var(--lamp, 0.7) * 0.16)), transparent 70%)',
           }}
@@ -301,42 +320,4 @@ const MULLION: React.CSSProperties = {
   backgroundImage: 'linear-gradient(rgb(40 24 12 / 0.45), rgb(40 24 12 / 0.45)), var(--wood-texture)',
   backgroundSize: '100% 100%, 600px 600px',
   boxShadow: '0 2px 6px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 220 170 / 0.15)',
-}
-
-/**
- * A few pixels of depth as the pointer moves: far layers barely shift, near ones a little more.
- * Eased toward the target each frame and idle when settled; off for touch, reduced motion and focus.
- */
-function useParallax(ref: React.RefObject<HTMLDivElement | null>, enabled: boolean) {
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    if (!enabled || !window.matchMedia?.('(pointer: fine)').matches) {
-      el.style.setProperty('--px', '0')
-      el.style.setProperty('--py', '0')
-      return
-    }
-    let tx = 0
-    let ty = 0
-    let cx = 0
-    let cy = 0
-    let raf = 0
-    const tick = () => {
-      cx += (tx - cx) * 0.06
-      cy += (ty - cy) * 0.06
-      el.style.setProperty('--px', cx.toFixed(3))
-      el.style.setProperty('--py', cy.toFixed(3))
-      raf = Math.abs(tx - cx) + Math.abs(ty - cy) > 0.002 ? requestAnimationFrame(tick) : 0
-    }
-    const onMove = (e: PointerEvent) => {
-      tx = -((e.clientX / window.innerWidth) * 2 - 1)
-      ty = -((e.clientY / window.innerHeight) * 2 - 1)
-      if (!raf) raf = requestAnimationFrame(tick)
-    }
-    window.addEventListener('pointermove', onMove, { passive: true })
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      cancelAnimationFrame(raf)
-    }
-  }, [ref, enabled])
 }

@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils'
 import { usePrefs } from '@/store/prefs'
 import { useUI } from '@/store/ui'
 import { WoodSwatch } from './WoodSwatch'
+import { WallpaperSettings } from './WallpaperSettings'
+import { useReduce } from '@/hooks/useMotionLevel'
 
 const VERSION = '1.0.0'
 
@@ -29,6 +31,7 @@ export function SettingsPanel() {
   const { d } = useI18n()
   const prefs = usePrefs((s) => s.prefs)
   const update = usePrefs((s) => s.update)
+  const reduce = useReduce()
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pt-[calc(1.25rem+var(--safe-top))] pb-28 sm:px-6 md:pt-10 md:pb-16">
@@ -70,11 +73,49 @@ export function SettingsPanel() {
         <Row label={d.settings.noteColor} stacked>
           <ColorPicker value={prefs.defaultNoteColor} onChange={(c) => update({ defaultNoteColor: c })} label={d.settings.noteColor} />
         </Row>
-        <Row label={d.settings.motion} stacked>
-          <Segmented label={d.settings.motion} value={prefs.motion} onChange={(motion) => update({ motion })} className="flex w-full" options={(['auto', 'full', 'reduced', 'off'] as const).map((v) => ({ value: v, label: d.settings.motions[v] }))} />
-        </Row>
         <Row label={d.settings.motivation}>
           <Switch checked={prefs.showMotivation} onCheckedChange={(showMotivation) => update({ showMotivation })} aria-label={d.settings.motivation} />
+        </Row>
+      </Section>
+
+      <Section title={d.wallpaper.title}>
+        <WallpaperSettings />
+      </Section>
+
+      <Section title={d.fx.title}>
+        <Row label={d.fx.intensity} stacked>
+          <Segmented
+            label={d.fx.intensity}
+            value={prefs.intensity}
+            onChange={(intensity) => update({ intensity })}
+            className="flex w-full"
+            options={(['off', 'subtle', 'lively'] as const).map((v) => ({ value: v, label: d.fx.intensities[v] }))}
+          />
+        </Row>
+        <Row label={d.fx.reduced} help={prefs.reducedMotion === 'system' ? d.fx.reducedSystem : undefined}>
+          <div className="flex items-center gap-2">
+            {prefs.reducedMotion !== 'system' && (
+              <Button variant="ghost" size="sm" onClick={() => update({ reducedMotion: 'system' })}>
+                {d.fx.followSystem}
+              </Button>
+            )}
+            <Switch checked={reduce} onCheckedChange={(on) => update({ reducedMotion: on ? 'on' : 'off' })} aria-label={d.fx.reduced} />
+          </div>
+        </Row>
+        <Row label={d.fx.physics} help={d.fx.physicsHelp}>
+          <Switch checked={prefs.notePhysics} onCheckedChange={(notePhysics) => update({ notePhysics })} aria-label={d.fx.physics} />
+        </Row>
+        <Row label={d.fx.completion} help={d.fx.completionHelp}>
+          <Switch checked={prefs.completionEffects} onCheckedChange={(completionEffects) => update({ completionEffects })} aria-label={d.fx.completion} />
+        </Row>
+        <Row label={d.fx.celebration} help={d.fx.celebrationHelp}>
+          <Switch checked={prefs.celebration} onCheckedChange={(celebration) => update({ celebration })} aria-label={d.fx.celebration} />
+        </Row>
+        <Row label={d.fx.parallax}>
+          <Switch checked={prefs.parallax} onCheckedChange={(parallax) => update({ parallax })} aria-label={d.fx.parallax} />
+        </Row>
+        <Row label={d.settings.soundEffects}>
+          <Switch checked={prefs.sound} onCheckedChange={(sound) => update({ sound })} aria-label={d.settings.soundEffects} />
         </Row>
       </Section>
 
@@ -474,7 +515,12 @@ function DataSection() {
         body={d.settings.resetBody}
         confirmLabel={d.settings.resetConfirm}
         danger
-        onConfirm={() => clearAllData().then(() => toast(d.settings.resetDone), reportError)}
+        onConfirm={() =>
+          clearAllData().then(() => {
+            usePrefs.getState().update({ wallpaperWorkspace: null, wallpaperWindow: null })
+            toast(d.settings.resetDone)
+          }, reportError)
+        }
       />
     </Section>
   )

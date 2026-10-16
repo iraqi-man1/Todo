@@ -12,6 +12,8 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { Check, ChevronDown, Eye, EyeOff, MoreHorizontal, Palette, Plus, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
 import { DoneStamp } from '@/components/paper/DoneStamp'
+import { PaperPhysics } from '@/components/paper/PaperPhysics'
+import { useEffects } from '@/hooks/useMotionLevel'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Paper } from '@/components/paper/StickyNote'
 import { ConfirmDialog } from '@/components/ui/dialog'
@@ -57,6 +59,7 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
   ref,
 ) {
   const { d, f } = useI18n()
+  const fx = useEffects()
   const openEditor = useUI((s) => s.openEditor)
   const hideCompleted = useUI((s) => s.hideCompleted)
   const setHideCompleted = useUI((s) => s.setHideCompleted)
@@ -114,13 +117,14 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
   useEffect(() => {
     if (allDone && !wasDone.current) {
       setStampKey((k) => k + 1)
-      if (level !== 'off') setTimeout(() => playSound('pin'), level === 'full' ? 320 : 0)
+      if (fx.celebration) setTimeout(() => playSound('pin'), level === 'full' ? 620 : 0)
     }
     wasDone.current = allDone
-  }, [allDone, level])
+  }, [allDone, level, fx.celebration])
 
   return (
     <motion.section animate={controls} aria-label={note.title || d.today.untitledNote} className="relative">
+      <PaperPhysics enabled={fx.physics} amp={fx.amp * 0.6}>
       <Paper color={note.color} className="px-3 pt-3 pb-4 transition-[background-color] duration-300 sm:px-5 sm:pt-4">
         <header className="flex items-center gap-2 ps-1">
           <input
@@ -203,13 +207,13 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
             <motion.span
               key={stampKey}
               aria-hidden
-              className="pointer-events-none absolute end-4 top-12 z-10"
-              initial={stampKey && level !== 'off' ? (level === 'full' ? { scale: 2.2, opacity: 0, rotate: -28 } : { opacity: 0 }) : false}
+              className="pointer-events-none absolute end-16 bottom-1 z-10"
+              initial={stampKey && fx.celebration ? (level === 'full' ? { scale: 2.2, opacity: 0, rotate: -28 } : { opacity: 0 }) : false}
               animate={{ scale: 1, opacity: 1, rotate: 0 }}
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-              transition={{ type: 'spring', stiffness: 420, damping: 16, delay: level === 'full' ? 0.25 : 0 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 16, delay: level === 'full' ? 0.55 : 0 }}
             >
-              <DoneStamp size={70} label={d.stamp} rotate={-10} />
+              <DoneStamp size={74} label={d.stampCompleted} rotate={-10} />
             </motion.span>
           )}
         </AnimatePresence>
@@ -247,6 +251,7 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
 
         {editable && <AddTaskInput ref={inputRef} noteId={note.id} date={note.date} onError={onError} />}
       </Paper>
+      </PaperPhysics>
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}

@@ -12,7 +12,7 @@ import { clearHistory } from '@/store/history'
 import { undo, redo } from '@/store/history'
 
 function setup() {
-  usePrefs.setState({ prefs: { ...DEFAULT_PREFS, motion: 'off' }, ready: true })
+  usePrefs.setState({ prefs: { ...DEFAULT_PREFS, intensity: 'off' }, ready: true })
   return render(
     <MotionConfig reducedMotion="always">
       <TooltipProvider>

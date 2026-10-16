@@ -12,12 +12,15 @@ export function CompletionCelebration({
   date,
   level,
   busy,
+  animated,
   onPin,
   onDismiss,
 }: {
   date: DateKey
   level: MotionLevel
   busy: boolean
+  /** Play confetti only when the day was just completed, not on every visit. */
+  animated: boolean
   onPin: () => void
   onDismiss: () => void
 }) {
@@ -32,6 +35,7 @@ export function CompletionCelebration({
       className="relative overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-soft"
     >
       {level === 'full' &&
+        animated &&
         Array.from({ length: 18 }, (_, i) => (
           <motion.span
             key={i}

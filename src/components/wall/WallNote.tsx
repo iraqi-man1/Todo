@@ -2,6 +2,8 @@ import { CircleDashed, Plus } from 'lucide-react'
 import { motion } from 'motion/react'
 import { memo, useEffect } from 'react'
 import { DraggableNote, type Offset } from './drag'
+import { PaperPhysics } from '@/components/paper/PaperPhysics'
+import { useEffects } from '@/hooks/useMotionLevel'
 import { DoneStamp } from '@/components/paper/DoneStamp'
 import { Pushpin, type PinColor } from '@/components/paper/Pushpin'
 import { Paper } from '@/components/paper/StickyNote'
@@ -38,12 +40,15 @@ export interface WallNoteProps {
   hidden?: boolean
   arrive?: boolean
   offset?: Offset
+  /** Staggered entrance when a new period slides in. */
+  enter?: { index: number; delay: number }
   onOpen: (date: DateKey, el: HTMLElement, rotate: number) => void
   onArrived?: () => void
 }
 
 /** One day's slot on the wall. Every state has text, not just color, so status never relies on color alone. */
-export const WallNote = memo(function WallNote({ date, status, summary, archive, fallbackColor, size, level, dimmed, hidden, arrive, offset, onOpen, onArrived }: WallNoteProps) {
+export const WallNote = memo(function WallNote({ date, status, summary, archive, fallbackColor, size, level, dimmed, hidden, arrive, offset, enter, onOpen, onArrived }: WallNoteProps) {
+  const fx = useEffects()
   const { d, f, date: fmt } = useI18n()
   const rot = noteRotation(date)
   const lg = size === 'lg'
@@ -56,8 +61,8 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
 
   useEffect(() => {
     if (!arrive || level === 'off') return
-    const t1 = setTimeout(() => playSound('pin'), level === 'full' ? 1050 : 250)
-    const t2 = setTimeout(() => onArrived?.(), 2600)
+    const t1 = setTimeout(() => playSound('pin'), level === 'full' ? 1080 : 250)
+    const t2 = setTimeout(() => onArrived?.(), 3000)
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
@@ -123,46 +128,84 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
   const pinned = status === 'pinned'
   const pin = seededPick(date, PINS)
   const full = level === 'full'
+  const physics = fx.physics && !arrive
+  // Arrival: glide in, wait for the pin, then swing to rest around it.
+  const arriveFull = arrive && full
   return (
-    <DraggableNote date={date} offset={offset} level={level} enabled={pinned && !arrive}>
+    <DraggableNote date={date} offset={offset} level={level} enabled={pinned && !arrive} amp={fx.physics ? fx.amp : 0}>
     <motion.button
       type="button"
       data-date={date}
       onClick={(e) => onOpen(date, e.currentTarget, rot)}
       aria-label={aria}
+      aria-keyshortcuts={pinned ? 'Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown' : undefined}
       className={cn('group relative block text-start outline-offset-4', dims, dimmed && 'opacity-30', hidden && 'invisible')}
-      initial={arrive && level !== 'off' ? (full ? { scale: 1.55, y: -90, rotate: rot + 12, opacity: 0 } : { opacity: 0 }) : false}
-      animate={{ scale: 1, y: 0, rotate: rot, opacity: 1 }}
-      transition={arrive ? (full ? { delay: 0.55, type: 'spring', stiffness: 140, damping: 15, mass: 0.9 } : { delay: 0.1, duration: 0.2 }) : { duration: 0 }}
-      whileHover={level === 'off' ? undefined : { y: -3, rotate: rot * 0.6, transition: { type: 'spring', stiffness: 400, damping: 22 } }}
+      style={{ originY: 0 }}
+      initial={
+        arrive && level !== 'off'
+          ? full
+            ? { scale: 1.35, y: -70, rotate: rot + 12, opacity: 0 }
+            : { opacity: 0 }
+          : enter && level !== 'off'
+            ? { opacity: 0, y: full ? -10 : 0, rotate: rot + (full ? (enter.index % 2 ? 3 : -3) : 0) }
+            : false
+      }
+      animate={
+        arriveFull
+          ? { scale: 1, y: 0, opacity: 1, rotate: [rot + 12, rot + 4, rot + 4, rot - 2.4, rot + 0.9, rot - 0.3, rot] }
+          : { scale: 1, y: 0, rotate: rot, opacity: 1 }
+      }
+      transition={
+        arriveFull
+          ? {
+              scale: { delay: 0.55, type: 'spring', stiffness: 150, damping: 17 },
+              y: { delay: 0.55, type: 'spring', stiffness: 150, damping: 17 },
+              opacity: { delay: 0.55, duration: 0.2 },
+              rotate: { delay: 0.55, duration: 1.9, times: [0, 0.22, 0.34, 0.5, 0.66, 0.82, 1], ease: 'easeInOut' },
+            }
+          : arrive
+            ? { delay: 0.1, duration: 0.2 }
+            : enter && level !== 'off'
+              ? { delay: enter.delay, ...(full ? { type: 'spring', stiffness: 260, damping: 20 } : { duration: 0.18 }) }
+              : { duration: 0 }
+      }
+      whileHover={physics || level === 'off' ? undefined : { y: -3, transition: { type: 'spring', stiffness: 400, damping: 22 } }}
     >
-      <Paper color={color} className={cn('flex h-full w-full flex-col transition-shadow group-hover:shadow-lift', lg ? 'p-4 pt-5' : 'p-3 pt-3.5', !pinned && 'opacity-90')}>
-        <span className={cn('font-semibold tracking-wider text-[#302c28]/55 uppercase', lg ? 'text-sm' : 'text-[11px]')}>{fmt(date, 'weekdayShort')}</span>
-        <span className={cn('font-hand leading-[0.9] text-[#302c28]', lg ? 'text-[64px]' : 'text-[46px]')}>{fmt(date, 'day')}</span>
-        {archive?.title && <span className={cn('font-hand truncate leading-tight text-[#302c28]/80', lg ? 'text-2xl' : 'text-lg')}>{archive.title}</span>}
-        <span className="mt-auto">
-          <span className={cn('block font-medium tabular-nums text-[#302c28]/70', lg ? 'text-sm' : 'text-[12px]')}>
-            {f(d.wall.tasksDone, { done, total })} · {summary?.percentage ?? 0}%
+      <PaperPhysics enabled={physics} amp={fx.amp} tilt maxTilt={lg ? 2.5 : 3.5}>
+        <Paper color={color} className={cn('flex h-full w-full flex-col', lg ? 'p-4 pt-5' : 'p-3 pt-3.5', !pinned && 'opacity-90')}>
+          <span className={cn('font-semibold tracking-wider text-[#302c28]/55 uppercase', lg ? 'text-sm' : 'text-[11px]')}>{fmt(date, 'weekdayShort')}</span>
+          <span className={cn('font-hand leading-[0.9] text-[#302c28]', lg ? 'text-[64px]' : 'text-[46px]')}>{fmt(date, 'day')}</span>
+          {archive?.title && <span className={cn('font-hand truncate leading-tight text-[#302c28]/80', lg ? 'text-2xl' : 'text-lg')}>{archive.title}</span>}
+          <span className="mt-auto">
+            <span className={cn('block font-medium tabular-nums text-[#302c28]/70', lg ? 'text-sm' : 'text-[12px]')}>
+              {f(d.wall.tasksDone, { done, total })} · {summary?.percentage ?? 0}%
+            </span>
+            {!pinned && <span className="mt-0.5 block text-[11px] font-semibold tracking-wide text-[#302c28]/60 uppercase">{d.celebrate.readyToPin}</span>}
           </span>
-          {!pinned && <span className="mt-0.5 block text-[11px] font-semibold tracking-wide text-[#302c28]/60 uppercase">{d.celebrate.readyToPin}</span>}
-        </span>
-      </Paper>
-      {pinned && (
-        <motion.span
-          className={cn('absolute end-1', lg ? 'top-6' : 'top-4')}
-          initial={arrive && level !== 'off' ? { scale: 1.9, opacity: 0, rotate: -30 } : false}
-          animate={{ scale: 1, opacity: 1, rotate: 0 }}
-          transition={arrive ? { delay: full ? 1.35 : 0.3, type: 'spring', stiffness: 380, damping: 14 } : { duration: 0 }}
-        >
-          <DoneStamp size={lg ? 64 : 44} label={d.stamp} rotate={-14 + rot * 2} />
-        </motion.span>
-      )}
+        </Paper>
+        {pinned && (
+          <motion.span
+            className={cn('absolute end-1', lg ? 'top-6' : 'top-4')}
+            initial={arrive && level !== 'off' ? { scale: 1.9, opacity: 0, rotate: -30 } : false}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            transition={arrive ? { delay: full ? 2.0 : 0.3, type: 'spring', stiffness: 380, damping: 14 } : { duration: 0 }}
+          >
+            <DoneStamp size={lg ? 64 : 44} label={d.stamp} rotate={-14 + rot * 2} />
+          </motion.span>
+        )}
+      </PaperPhysics>
       {pinned ? (
         <motion.span
-          className="absolute -top-1.5 left-1/2 -ml-[9px] block"
-          initial={arrive && level !== 'off' ? { scale: 0, y: -14, opacity: 0 } : false}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          transition={arrive ? { delay: full ? 1.05 : 0.25, type: 'spring', stiffness: 600, damping: 18 } : { duration: 0 }}
+          className="absolute -top-1.5 left-1/2 z-10 -ml-[9px] block"
+          initial={arrive && level !== 'off' ? (full ? { y: -18, scale: 1.3, opacity: 0 } : { opacity: 0 }) : false}
+          animate={{ y: 0, scale: 1, opacity: 1 }}
+          transition={
+            arrive
+              ? full
+                ? { opacity: { delay: 1.0, duration: 0.12 }, y: { delay: 1.0, type: 'spring', stiffness: 700, damping: 26 }, scale: { delay: 1.0, type: 'spring', stiffness: 700, damping: 26 } }
+                : { delay: 0.25, duration: 0.15 }
+              : { duration: 0 }
+          }
         >
           <Pushpin color={pin} size={lg ? 22 : 18} className="relative" />
         </motion.span>

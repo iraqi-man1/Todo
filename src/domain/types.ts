@@ -124,7 +124,11 @@ export interface AchievementRecord {
 
 export type ThemePref = 'night' | 'system' | 'light' | 'dark'
 export type WoodTheme = 'light-oak' | 'natural-oak' | 'dark-walnut'
+/** @deprecated replaced by `intensity` + `reducedMotion`; kept so old saved prefs can be migrated. */
 export type MotionPref = 'auto' | 'full' | 'reduced' | 'off'
+export type Intensity = 'off' | 'subtle' | 'lively'
+export type ReducedMotionPref = 'system' | 'on' | 'off'
+export type WallpaperMode = 'fill' | 'fit' | 'center'
 export type Language = 'en' | 'ar'
 export type DateFormatPref = 'friendly' | 'dmy' | 'mdy' | 'iso'
 
@@ -154,6 +158,42 @@ export interface Prefs {
   showWindow: boolean
   ambientSound: boolean
   focusMode: boolean
+  /** Motion & Effects */
+  intensity: Intensity
+  reducedMotion: ReducedMotionPref
+  notePhysics: boolean
+  completionEffects: boolean
+  celebration: boolean
+  parallax: boolean
+  /** Active custom wallpapers (ids in the wallpapers table); null = the original DoneWall scene. */
+  wallpaperWorkspace: string | null
+  wallpaperWindow: string | null
+  updatedAt: number
+}
+
+/** A user wallpaper, stored locally. Image bytes are kept once; settings travel with the image. */
+export interface Wallpaper {
+  id: string
+  name: string
+  /** SHA-256 of the original file, used to avoid storing the same image twice. */
+  hash: string
+  type: string
+  data: ArrayBuffer
+  thumb: ArrayBuffer
+  width: number
+  height: number
+  mode: WallpaperMode
+  /** Focal point, 0–100 % */
+  posX: number
+  posY: number
+  /** Crop zoom, ≥ 1 */
+  zoom: number
+  brightness: number
+  blur: number
+  opacity: number
+  overlay: number
+  parallax: number
+  createdAt: number
   updatedAt: number
 }
 
@@ -180,5 +220,28 @@ export const DEFAULT_PREFS: Prefs = {
   showWindow: true,
   ambientSound: false,
   focusMode: false,
+  intensity: 'lively',
+  reducedMotion: 'system',
+  notePhysics: true,
+  completionEffects: true,
+  celebration: true,
+  parallax: true,
+  wallpaperWorkspace: null,
+  wallpaperWindow: null,
   updatedAt: 0,
+}
+
+/** Map preferences saved by older versions onto the current shape. Pure, so it can be tested. */
+export function migratePrefs(raw: Partial<Prefs> | undefined): Prefs {
+  const p = { ...DEFAULT_PREFS, ...raw }
+  if (raw && raw.intensity === undefined && raw.motion) {
+    const map: Record<MotionPref, Pick<Prefs, 'intensity' | 'reducedMotion'>> = {
+      auto: { intensity: 'lively', reducedMotion: 'system' },
+      full: { intensity: 'lively', reducedMotion: 'off' },
+      reduced: { intensity: 'subtle', reducedMotion: 'system' },
+      off: { intensity: 'off', reducedMotion: 'system' },
+    }
+    Object.assign(p, map[raw.motion] ?? {})
+  }
+  return p
 }

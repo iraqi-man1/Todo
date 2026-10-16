@@ -62,6 +62,13 @@ function useDocumentPrefs() {
     }
   }, [prefs.wood])
 
+  // Pause decorative CSS animations while the app is in the background.
+  useEffect(() => {
+    const on = () => document.documentElement.classList.toggle('app-hidden', document.visibilityState === 'hidden')
+    document.addEventListener('visibilitychange', on)
+    return () => document.removeEventListener('visibilitychange', on)
+  }, [])
+
   useEffect(() => {
     void paperNoise().then((url) => url && document.documentElement.style.setProperty('--paper-noise', `url(${url})`))
   }, [])

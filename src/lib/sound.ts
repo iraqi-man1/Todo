@@ -4,7 +4,7 @@
  */
 import { usePrefs } from '@/store/prefs'
 
-export type SoundName = 'tap' | 'paper' | 'pin' | 'chime'
+export type SoundName = 'tap' | 'pencil' | 'paper' | 'pin' | 'chime'
 
 let ctx: AudioContext | null = null
 
@@ -65,6 +65,13 @@ export function playSound(name: SoundName, force = false) {
       burst(ac, master, t, 0.06, 2400, 1.2, 0.5)
       burst(ac, master, t, 0.03, 600, 2, 0.4)
       break
+    case 'pencil': {
+      // a short graphite tick: two quick strokes of filtered noise
+      burst(ac, master, t, 0.05, 3800, 2.5, 0.22)
+      burst(ac, master, t + 0.06, 0.09, 4600, 2, 0.3)
+      burst(ac, master, t, 0.03, 900, 3, 0.18)
+      break
+    }
     case 'paper':
       burst(ac, master, t, 0.25, 3200, 0.7, 0.25)
       burst(ac, master, t + 0.08, 0.2, 1800, 0.8, 0.18)

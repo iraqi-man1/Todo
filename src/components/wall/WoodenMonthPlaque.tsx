@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 
 function Screw({ className }: { className?: string }) {
@@ -49,7 +50,18 @@ export function WoodenMonthPlaque({
         className={cn('font-semibold tracking-[0.28em] uppercase', lg ? 'text-[30px]' : 'text-[17px]')}
         style={{ color: '#F3DDB8', textShadow: '0 -1px 0 rgb(0 0 0 / 0.55), 0 1px 0 rgb(255 230 190 / 0.18)' }}
       >
-        {title}
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={title}
+            className="inline-block"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {title}
+          </motion.span>
+        </AnimatePresence>
       </p>
       {subtitle && (
         <p className={cn('mt-0.5 font-medium tracking-wider', lg ? 'text-[15px]' : 'text-[12px]')} style={{ color: 'rgb(243 221 184 / 0.75)' }}>

@@ -1,4 +1,4 @@
-import { animate, motion, useMotionValue } from 'motion/react'
+import { animate, motion, useMotionValue, useSpring, useTransform } from 'motion/react'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { DateKey } from '@/domain/types'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
@@ -61,14 +61,16 @@ export const WallGestureContext = createContext<WallGesture | null>(null)
 const HOLD_MS = { mouse: 170, touch: 280, pen: 220 } as const
 
 /**
- * Lets a pinned note be picked up (press and hold) and nudged within its slot. A quick drag still pans
- * the wall, and Alt+Arrow keys nudge it for keyboard users.
+ * Lets a pinned note be picked up (press and hold) and nudged within its slot. While carried it tilts
+ * with the cursor's speed and its shadow grows; on release it settles with a soft overshoot and a small
+ * swing on its pin. A quick drag still pans the wall, and Alt+Arrow keys nudge it for keyboard users.
  */
 export function DraggableNote({
   date,
   offset,
   level,
   enabled,
+  amp = 1,
   children,
   className,
 }: {
@@ -76,6 +78,8 @@ export function DraggableNote({
   offset?: Offset
   level: MotionLevel
   enabled: boolean
+  /** Physics strength (0 disables tilt/swing; dragging still works). */
+  amp?: number
   children: React.ReactNode
   className?: string
 }) {
@@ -83,20 +87,31 @@ export function DraggableNote({
   const gesture = useContext(WallGestureContext)
   const x = useMotionValue(offset?.x ?? 0)
   const y = useMotionValue(offset?.y ?? 0)
+  const tilt = useSpring(0, { stiffness: 260, damping: 16, mass: 0.6 })
+  const lift = useSpring(0, { stiffness: 320, damping: 26 })
+  const scale = useTransform(lift, (v) => 1 + v * 0.06)
+  const shadowY = useTransform(lift, (v) => v * 20)
+  const shadowOpacity = useTransform(lift, (v) => v * 0.55)
+  const shadowScale = useTransform(lift, (v) => 0.9 + v * 0.18)
   const [lifted, setLifted] = useState(false)
-  const st = useRef<{ timer?: ReturnType<typeof setTimeout>; sx: number; sy: number; base: Offset; id: number | null; suppress: boolean }>({
-    sx: 0,
-    sy: 0,
-    base: { x: 0, y: 0 },
-    id: null,
-    suppress: false,
-  })
+  const st = useRef<{
+    timer?: ReturnType<typeof setTimeout>
+    sx: number
+    sy: number
+    base: Offset
+    id: number | null
+    suppress: boolean
+    vx: number
+    lx: number
+    lt: number
+    up: boolean
+  }>({ sx: 0, sy: 0, base: { x: 0, y: 0 }, id: null, suppress: false, vx: 0, lx: 0, lt: 0, up: false })
   const active = enabled && !!layout && !!gesture
 
   // Follow external changes (undo, import, reset) when not being dragged.
   useEffect(() => {
     if (lifted) return
-    const t = level === 'off' ? { duration: 0 } : { type: 'spring' as const, stiffness: 380, damping: 30 }
+    const t = level === 'off' ? { duration: 0 } : { type: 'spring' as const, stiffness: 300, damping: 22 }
     const a = [animate(x, offset?.x ?? 0, t), animate(y, offset?.y ?? 0, t)]
     return () => a.forEach((c) => c.stop())
   }, [offset?.x, offset?.y, lifted, level, x, y])
@@ -107,15 +122,28 @@ export function DraggableNote({
     if (!home) return
     const prev = offset ?? { x: 0, y: 0 }
     const next = resolveOffset(target, prev, home, layout.obstacles(date), layout.limit)
-    const t = level === 'off' ? { duration: 0 } : { type: 'spring' as const, stiffness: 420, damping: 28 }
+    // Settle: a little overshoot into place, then a damped swing on the pin.
+    const t = level === 'off' ? { duration: 0 } : { type: 'spring' as const, stiffness: 300, damping: 17, mass: 0.8 }
     animate(x, next.x, t)
     animate(y, next.y, t)
+    if (amp > 0 && level !== 'off') {
+      tilt.set(Math.max(-4, Math.min(4, -st.current.vx * 3)) * amp)
+      setTimeout(() => tilt.set(0), 60)
+    } else tilt.jump(0)
     if (next.x !== prev.x || next.y !== prev.y) layout.onMove(date, next.x === 0 && next.y === 0 ? undefined : next)
   }
 
   const clear = () => {
     clearTimeout(st.current.timer)
     st.current.timer = undefined
+  }
+
+  const drop = (target: Offset) => {
+    if (!st.current.up) return
+    st.current.up = false
+    setLifted(false)
+    lift.set(0)
+    commit(target)
   }
 
   return (
@@ -127,6 +155,9 @@ export function DraggableNote({
         const s = st.current
         s.sx = e.clientX
         s.sy = e.clientY
+        s.lx = e.clientX
+        s.lt = performance.now()
+        s.vx = 0
         s.id = e.pointerId
         s.base = { x: x.get(), y: y.get() }
         const target = e.currentTarget
@@ -139,13 +170,16 @@ export function DraggableNote({
             /* pointer already released */
           }
           s.suppress = true
+          s.up = true
           setLifted(true)
+          lift.set(1)
+          if (amp > 0) tilt.set(-1.5 * amp)
           navigator.vibrate?.(8)
         }, HOLD_MS[e.pointerType as keyof typeof HOLD_MS] ?? 220)
       }}
       onPointerMove={(e) => {
         const s = st.current
-        if (!lifted) {
+        if (!s.up) {
           if (s.timer && Math.hypot(e.clientX - s.sx, e.clientY - s.sy) > 6) clear()
           return
         }
@@ -156,20 +190,27 @@ export function DraggableNote({
         const ny = s.base.y + (e.clientY - s.sy) / k
         x.set(Math.max(-lim.x - 12, Math.min(lim.x + 12, nx)))
         y.set(Math.max(-lim.y - 12, Math.min(lim.y + 12, ny)))
+        // Lean into the motion: smoothed horizontal speed → rotation (capped, so it never wobbles).
+        const now = performance.now()
+        const v = (e.clientX - s.lx) / Math.max(8, now - s.lt)
+        s.vx = s.vx * 0.7 + v * 0.3
+        s.lx = e.clientX
+        s.lt = now
+        if (amp > 0) tilt.set(Math.max(-8, Math.min(8, s.vx * 9)) * amp)
       }}
       onPointerUp={(e) => {
         clear()
-        if (!lifted) return
+        if (!st.current.up) return
         e.stopPropagation()
-        setLifted(false)
-        commit({ x: x.get(), y: y.get() })
+        drop({ x: x.get(), y: y.get() })
       }}
       onPointerCancel={() => {
         clear()
-        if (lifted) {
-          setLifted(false)
-          commit(st.current.base)
-        }
+        drop(st.current.base)
+      }}
+      onLostPointerCapture={() => {
+        // Interrupted drag (alt-tab, system gesture): put the note down where it was picked up.
+        drop(st.current.base)
       }}
       onClickCapture={(e) => {
         if (st.current.suppress) {
@@ -187,11 +228,13 @@ export function DraggableNote({
         commit({ x: (offset?.x ?? 0) + step[0], y: (offset?.y ?? 0) + step[1] })
       }}
     >
+      {/* The carried note's shadow on the wood: further and softer the higher it is lifted. */}
       <motion.div
-        animate={lifted ? { scale: 1.07, rotate: -1.5 } : { scale: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        className={cn(lifted && 'cursor-grabbing drop-shadow-[0_22px_18px_rgb(20_10_0/0.45)]')}
-      >
+        aria-hidden
+        className="pointer-events-none absolute inset-[4%] rounded-[30%]"
+        style={{ y: shadowY, scale: shadowScale, opacity: shadowOpacity, background: 'radial-gradient(ellipse at 50% 55%, rgb(15 8 2 / 0.7), transparent 70%)' }}
+      />
+      <motion.div style={{ rotate: tilt, scale }} className={cn('relative', lifted && 'cursor-grabbing')}>
         {children}
       </motion.div>
     </motion.div>

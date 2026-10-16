@@ -172,6 +172,7 @@ export function WoodenWall() {
           setWall({ wallView: 'month', wallAnchor: m })
         },
         onMoveNote,
+        dirn,
       }
     : null
 
@@ -291,19 +292,14 @@ export function WoodenWall() {
                 />
               )}
             >
-              <AnimatePresence mode="popLayout" initial={false} custom={dirn}>
+              {/* The board stays put across periods (pages turn inside it); only a view change swaps it. */}
+              <AnimatePresence mode="popLayout" initial={false}>
                 <motion.div
-                  key={fitKey}
-                  custom={dirn}
-                  variants={{
-                    enter: (dn: number) => (level === 'off' ? {} : { opacity: 0, x: level === 'full' ? dn * 70 : 0, scale: dn || level !== 'full' ? 1 : 0.97 }),
-                    center: { opacity: 1, x: 0, scale: 1 },
-                    exit: (dn: number) => (level === 'off' ? {} : { opacity: 0, x: level === 'full' ? dn * -70 : 0, transition: { duration: 0.16 } }),
-                  }}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: dur(level, 0.32), ease: [0.22, 1, 0.36, 1] }}
+                  key={`${view}|${narrow}`}
+                  initial={level === 'off' ? false : { opacity: 0, scale: level === 'full' ? 0.975 : 1 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={level === 'off' ? undefined : { opacity: 0, transition: { duration: 0.14 } }}
+                  transition={{ duration: dur(level, 0.3), ease: [0.22, 1, 0.36, 1] }}
                 >
                   {view === 'month' && <MonthBoard {...boardProps} />}
                   {view === 'week' && <WeekBoard {...boardProps} />}

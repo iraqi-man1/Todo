@@ -14,7 +14,7 @@ import type {
   Recurrence,
   Task,
 } from './types'
-import { DEFAULT_PREFS, NOTE_COLORS } from './types'
+import { migratePrefs, NOTE_COLORS } from './types'
 
 const now = () => Date.now()
 
@@ -430,8 +430,7 @@ export async function materializeRecurrences(date: DateKey, today: DateKey, colo
 // ---------------- Preferences ----------------
 
 export async function loadPrefs(): Promise<Prefs> {
-  const p = await db.prefs.get('prefs')
-  return { ...DEFAULT_PREFS, ...p }
+  return migratePrefs(await db.prefs.get('prefs'))
 }
 
 export async function savePrefs(patch: Partial<Omit<Prefs, 'id'>>) {
@@ -447,10 +446,10 @@ export function nextNoteColor(used: NoteColor[], preferred: NoteColor): NoteColo
 export async function clearAllData() {
   await db.transaction(
     'rw',
-    [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements],
+    [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers],
     async () => {
       await Promise.all(
-        [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements].map(
+        [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers].map(
           (t) => t.clear(),
         ),
       )

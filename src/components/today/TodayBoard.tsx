@@ -33,6 +33,8 @@ import { cn } from '@/lib/utils'
 import { usePrefs } from '@/store/prefs'
 import { useUI } from '@/store/ui'
 import { CompletionCelebration } from './CompletionCelebration'
+import { useCompletionTransition } from '@/hooks/useCompletionTransition'
+import { useEffects } from '@/hooks/useMotionLevel'
 import { DailyProgress } from './DailyProgress'
 import { PlannerNote, type PlannerNoteHandle } from './PlannerNote'
 
@@ -71,7 +73,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
   const onToggle = async (t: Task) => {
     try {
       if (!t.completed) {
-        playSound('tap')
+        playSound('pencil')
         noteRefs.current.get(t.noteId)?.nudge()
       }
       await uToggleTask(t.id)
@@ -111,18 +113,71 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
     }
   }
 
+  // ---- End-of-day sequence: glow → stamp (in the note) → gentle lift, only on a real transition ----
+  const fx = useEffects()
+  const completeTick = useCompletionTransition(date, day ? !!summary?.complete : undefined)
+  const [seq, setSeq] = useState<'idle' | 'glow' | 'lifted'>('idle')
+  const [cardReady, setCardReady] = useState(true)
+  const seqTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const endSequence = () => {
+    seqTimers.current.forEach(clearTimeout)
+    seqTimers.current = []
+    setSeq('idle')
+    setCardReady(true)
+  }
+  useEffect(() => {
+    if (!completeTick) return
+    if (!fx.celebration) return
+    setCardReady(false)
+    const full = level === 'full'
+    seqTimers.current = [
+      setTimeout(() => setSeq('glow'), full ? 380 : 0),
+      setTimeout(() => setSeq('lifted'), full ? 1000 : 150),
+      setTimeout(() => setCardReady(true), full ? 1250 : 200),
+      setTimeout(() => playSound('chime'), full ? 700 : 0),
+      setTimeout(() => setSeq('idle'), full ? 2900 : 900),
+    ]
+    return () => seqTimers.current.forEach(clearTimeout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completeTick])
+  // If a task is reopened or added mid-sequence, stop at once.
+  useEffect(() => {
+    if (!summary?.complete && seq !== 'idle') endSequence()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary?.complete])
+  // Escape skips the sequence.
+  useEffect(() => {
+    if (seq === 'idle' && cardReady) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && endSequence()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [seq, cardReady])
+
+  const flight = useRef<{ x: number; y: number; timer?: ReturnType<typeof setTimeout> }>({ x: 120, y: -460 })
+  const notesRef = useRef<HTMLDivElement>(null)
+  const goToWall = () => {
+    clearTimeout(flight.current.timer)
+    setJustPinned(date)
+    setWall({ wallView: 'month', wallAnchor: date })
+    navigate({ name: 'wall' })
+  }
+
   const pin = async () => {
     try {
       const res = await uPin(date)
       if (!res.ok) return
       playSound('paper')
+      endSequence()
+      // Fly toward the wall: the "My Wall" navigation item if it's on screen.
+      const target = document.querySelector<HTMLElement>('[data-nav="wall"]')
+      const box = notesRef.current?.getBoundingClientRect()
+      if (target && box && target.offsetParent) {
+        const t = target.getBoundingClientRect()
+        flight.current.x = t.left + t.width / 2 - (box.left + box.width / 2)
+        flight.current.y = t.top + t.height / 2 - (box.top + Math.min(box.height, 400) / 2)
+      }
       setFlying(true)
-      const wait = dur(level, 0.85) * 1000
-      setTimeout(() => {
-        setJustPinned(date)
-        setWall({ wallView: 'month', wallAnchor: date })
-        navigate({ name: 'wall' })
-      }, wait)
+      flight.current.timer = setTimeout(goToWall, dur(level, 1.0) * 1000)
     } catch (e) {
       setFlying(false)
       reportError(e)
@@ -152,7 +207,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
     (activeNote && day?.notes.some((n) => n.id === activeNote) ? activeNote : null) ??
     day?.notes.find((n) => day.tasks.some((t) => t.noteId === n.id && !t.completed))?.id ??
     day?.notes[0]?.id
-  const showCelebrate = !!summary?.complete && !day?.archive && dismissed !== date && !flying
+  const showCelebrate = !!summary?.complete && !day?.archive && dismissed !== date && !flying && cardReady
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pt-[calc(1.25rem+var(--safe-top))] pb-32 sm:px-6 md:pt-10 md:pb-16">
@@ -223,7 +278,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
       <AnimatePresence>
         {showCelebrate && (
           <div className="mb-5">
-            <CompletionCelebration date={date} level={level} busy={flying} onPin={pin} onDismiss={() => setDismissed(date)} />
+            <CompletionCelebration date={date} level={level} busy={flying} animated={completeTick > 0 && fx.celebration} onPin={pin} onDismiss={() => setDismissed(date)} />
           </div>
         )}
       </AnimatePresence>
@@ -234,7 +289,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
           animate={{ opacity: 1, y: 0 }}
           className="mb-5 flex flex-col gap-4 rounded-3xl border border-line bg-surface p-5 shadow-soft sm:flex-row sm:items-center"
         >
-          <DoneStamp size={64} className="shrink-0" label={d.stamp} />
+          <DoneStamp size={64} className="shrink-0" label={d.stamp} onPaper={false} ink="var(--dw-success)" />
           <div className="flex-1">
             <p className="font-semibold">{d.today.pinnedTitle}</p>
             <p className="mt-0.5 text-sm text-ink-soft">{f(d.today.pinnedBody, { time: time(day.archive.archivedAt) })}</p>
@@ -259,22 +314,45 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
       {/* Notes */}
       {day && (
         <motion.div
+          ref={notesRef}
           className="relative"
-          style={{ transformPerspective: 900 }}
+          style={{ transformPerspective: 900, originY: 0.2 }}
           animate={
             flying
               ? {
-                  y: [0, -14, -460],
-                  x: [0, 0, 120],
-                  scale: [1, 1.03, 0.28],
-                  rotate: [0, -1.5, -9],
-                  rotateX: [0, 8, 22],
+                  y: [0, -16, flight.current.y],
+                  x: [0, 0, flight.current.x],
+                  scale: [1, 1.03, 0.16],
+                  rotate: [0, -2, -12],
+                  rotateX: [0, 8, 18],
                   opacity: [1, 1, 0],
                 }
-              : { y: 0, x: 0, scale: 1, rotate: 0, rotateX: 0, opacity: 1 }
+              : seq === 'lifted'
+                ? { y: -6, x: 0, scale: 1.008, rotate: -0.7, rotateX: 2, opacity: 1 }
+                : { y: 0, x: 0, scale: 1, rotate: 0, rotateX: 0, opacity: 1 }
           }
-          transition={flying ? { duration: dur(level, 0.85), times: [0, 0.3, 1], ease: [0.45, 0, 0.75, 0.4] } : { duration: 0 }}
+          transition={
+            flying
+              ? { duration: dur(level, 1.0), times: [0, 0.28, 1], ease: [0.45, 0, 0.7, 0.45] }
+              : level === 'off'
+                ? { duration: 0 }
+                : { type: 'spring', stiffness: 160, damping: 15 }
+          }
         >
+          {/* warm golden glow when the day is complete */}
+          <AnimatePresence>
+            {seq !== 'idle' && !flying && (
+              <motion.div
+                aria-hidden
+                className="pointer-events-none absolute -inset-6 -z-10 rounded-[40px]"
+                style={{ background: 'radial-gradient(ellipse at 50% 45%, rgb(242 193 78 / 0.38), rgb(232 173 103 / 0.16) 45%, transparent 72%)' }}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, transition: { duration: 0.9 } }}
+                transition={{ duration: 0.5 }}
+              />
+            )}
+          </AnimatePresence>
           {day.notes.length === 0 ? (
             <EmptyDay editable={editable} onStart={ensureFirstNote} />
           ) : (
@@ -345,6 +423,14 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {flying && level !== 'off' && (
+        <button type="button" onClick={goToWall} className="fixed inset-0 z-40 cursor-default" aria-label={d.fx.skip}>
+          <span className="absolute bottom-[calc(6rem+var(--safe-bottom))] left-1/2 -translate-x-1/2 rounded-full bg-surface/80 px-3 py-1.5 text-xs text-ink-soft backdrop-blur md:bottom-6">
+            {d.fx.skip}
+          </span>
+        </button>
+      )}
 
       {/* Mobile floating add button */}
       {editable && !flying && (

@@ -15,7 +15,8 @@ import { Paper } from '@/components/paper/StickyNote'
 import { DoneStamp } from '@/components/paper/DoneStamp'
 import { Pushpin } from '@/components/paper/Pushpin'
 import { noteRotation } from '@/domain/colors'
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { PageTurn } from './PageTurn'
 import { SlotLayoutContext, type Offset, type Rect, type SlotLayout } from './drag'
 
 export interface BoardProps {
@@ -34,6 +35,8 @@ export interface BoardProps {
   onArrived: () => void
   onPickMonth?: (key: DateKey) => void
   onMoveNote: (date: DateKey, offset: Offset | undefined) => void
+  /** Direction of the last period change (−1 back, 1 forward, 0 jump) for page-turn transitions. */
+  dirn: number
 }
 
 function dimmedFor(status: SlotStatus, filter: WallFilter) {
@@ -42,7 +45,7 @@ function dimmedFor(status: SlotStatus, filter: WallFilter) {
   return false
 }
 
-function Slot(p: BoardProps & { date: DateKey; size: 'md' | 'lg' }) {
+function Slot(p: BoardProps & { date: DateKey; size: 'md' | 'lg'; enter?: { index: number; delay: number } }) {
   const summary = p.summaries.get(p.date)
   const status = slotStatus(p.date, summary, p.today)
   return (
@@ -58,6 +61,7 @@ function Slot(p: BoardProps & { date: DateKey; size: 'md' | 'lg' }) {
       hidden={p.inspecting === p.date}
       arrive={p.justPinned === p.date}
       offset={p.archives.get(p.date)?.offset}
+      enter={p.enter}
       onOpen={p.onOpen}
       onArrived={p.onArrived}
     />
@@ -117,6 +121,10 @@ export function MonthBoard(p: BoardProps) {
   const pinnedCount = monthDays(p.anchor).filter((k) => p.archives.has(k)).length
   const pad = p.narrow ? 28 : 56
   const layout = useSlotLayout(p, cells, 7, { w: 140, h: 150 }, { x: 162, y: 172 })
+  const monthKey = p.anchor.slice(0, 7)
+  // Notes settle in one by one only after navigating, never on first open.
+  const first = useRef(monthKey)
+  const stagger = monthKey !== first.current
   return (
     <SlotLayoutContext.Provider value={layout}>
     <Board padding={pad}>
@@ -126,10 +134,14 @@ export function MonthBoard(p: BoardProps) {
         className="mb-9"
       />
       <WeekdayHeader weekStartsOn={p.weekStartsOn} lang={lang} cell={140} gap={22} />
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(7, 140px)', gap: 22 }}>
-        {cells.map((k, i) => (k ? <Slot key={k} {...p} date={k} size="md" /> : <div key={`x${i}`} className="h-[150px] w-[140px]" />))}
-      </div>
-      {pinnedCount === 0 && <p className="chalk font-hand mt-8 text-center text-[26px]">{d.wall.emptyMonth}</p>}
+      <PageTurn pageKey={monthKey} dirn={p.dirn} level={p.level}>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(7, 140px)', gap: 22 }}>
+          {cells.map((k, i) =>
+            k ? <Slot key={k} {...p} date={k} size="md" enter={stagger ? { index: i, delay: 0.08 + i * 0.016 } : undefined} /> : <div key={`x${i}`} className="h-[150px] w-[140px]" />,
+          )}
+        </div>
+        {pinnedCount === 0 && <p className="chalk font-hand mt-8 text-center text-[26px]">{d.wall.emptyMonth}</p>}
+      </PageTurn>
     </Board>
     </SlotLayoutContext.Provider>
   )
@@ -142,6 +154,7 @@ export function WeekBoard(p: BoardProps) {
   const cols = p.narrow ? 2 : 7
   const gap = p.narrow ? 28 : 30
   const layout = useSlotLayout(p, days, cols, { w: 220, h: 240 }, { x: 220 + gap, y: 272 + gap })
+  const firstWeek = useRef(days[0])
   return (
     <SlotLayoutContext.Provider value={layout}>
     <Board padding={p.narrow ? 28 : 56}>
@@ -150,14 +163,16 @@ export function WeekBoard(p: BoardProps) {
         subtitle={`${date(days[0], 'short')} – ${date(days[6], 'medium')} · ${f(d.wall.completedDays, { n: stats.completedDays })}`}
         className="mb-10"
       />
+      <PageTurn pageKey={days[0]} dirn={p.dirn} level={p.level}>
       <div className="grid" style={{ gridTemplateColumns: `repeat(${cols}, 220px)`, gap }}>
-        {days.map((k) => (
+        {days.map((k, i) => (
           <div key={k} className="flex flex-col items-center gap-3">
             <span className="engraved text-[13px] font-bold tracking-[0.2em] uppercase">{date(k, 'weekday')}</span>
-            <Slot {...p} date={k} size="lg" />
+            <Slot {...p} date={k} size="lg" enter={days[0] !== firstWeek.current ? { index: i, delay: 0.08 + i * 0.04 } : undefined} />
           </div>
         ))}
       </div>
+      </PageTurn>
     </Board>
     </SlotLayoutContext.Provider>
   )
@@ -173,6 +188,7 @@ export function DayBoard(p: BoardProps) {
   return (
     <Board padding={p.narrow ? 28 : 64}>
       <WoodenMonthPlaque title={date(p.anchor, 'weekday')} subtitle={date(p.anchor, 'medium')} className="mb-10" />
+      <PageTurn pageKey={p.anchor} dirn={p.dirn} level={p.level}>
       <div className="flex w-[min(460px,100%)] min-w-[340px] justify-center pb-4">
         {hasNote ? (
           <button
@@ -211,6 +227,7 @@ export function DayBoard(p: BoardProps) {
           <p className="chalk font-hand py-24 text-center text-[30px]">{d.wall.emptyDay}</p>
         )}
       </div>
+      </PageTurn>
     </Board>
   )
 }
@@ -223,6 +240,7 @@ export function YearBoard(p: BoardProps) {
   return (
     <Board padding={p.narrow ? 24 : 48}>
       <WoodenMonthPlaque title={String(year)} className="mb-10" />
+      <PageTurn pageKey={String(year)} dirn={p.dirn} level={p.level}>
       <div className="grid" style={{ gridTemplateColumns: `repeat(${cols}, 280px)`, gap: p.narrow ? 24 : 36 }}>
         {months.map((m) => {
           const stats = rangeStats(p.summaries, monthDays(m))
@@ -245,6 +263,7 @@ export function YearBoard(p: BoardProps) {
           )
         })}
       </div>
+      </PageTurn>
     </Board>
   )
 }

@@ -1,5 +1,12 @@
 import { useMedia } from '@/hooks/useMedia'
-import { useMotionLevel } from '@/hooks/useMotionLevel'
+import { useRef } from 'react'
+import { toast } from 'sonner'
+import { WallpaperImage } from '@/components/wallpaper/WallpaperImage'
+import type { Wallpaper } from '@/domain/types'
+import { useEffects, useMotionLevel } from '@/hooks/useMotionLevel'
+import { useParallax } from '@/hooks/useParallax'
+import { useActiveWallpapers } from '@/hooks/useWallpapers'
+import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { usePrefs } from '@/store/prefs'
 import { NightWindow } from './NightWindow'
@@ -9,11 +16,13 @@ export const WINDOW_W = 'clamp(260px, 26vw, 440px)'
 export function useEnvironment() {
   const prefs = usePrefs((s) => s.prefs)
   const level = useMotionLevel()
+  const fx = useEffects()
   const night = prefs.theme === 'night'
   return {
     night,
     windowShown: night && prefs.showWindow,
     animate: night && prefs.ambient && !prefs.focusMode && level === 'full',
+    parallax: fx.parallax && !prefs.focusMode,
   }
 }
 
@@ -47,18 +56,49 @@ function DeskLamp() {
   )
 }
 
+/** A custom photo behind the whole workspace, with optional gentle parallax. Works in every theme. */
+export function WorkspaceWallpaper({ wallpaper, parallax }: { wallpaper: Wallpaper; parallax: boolean }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const { d } = useI18n()
+  useParallax(ref, parallax)
+  return (
+    <div ref={ref} aria-hidden className="absolute inset-0">
+      <WallpaperImage
+        wallpaper={wallpaper}
+        settings={wallpaper}
+        parallaxDepth={16}
+        onError={() => {
+          usePrefs.getState().update({ wallpaperWorkspace: null })
+          toast.error(d.wallpaper.corrupt)
+        }}
+      />
+    </div>
+  )
+}
+
 /**
  * The room behind the app: a deep navy wall, the warm lamp, and the rainy window. Fixed, decorative,
  * and pointer-transparent; cards and notes sit on top of it.
  */
 export function Environment() {
   const prefs = usePrefs((s) => s.prefs)
-  const { night, windowShown, animate } = useEnvironment()
+  const { night, windowShown, animate, parallax } = useEnvironment()
   const lg = useMedia('(min-width: 1024px)')
-  if (!night) return null
+  const walls = useActiveWallpapers()
+  if (!night) {
+    // Other themes keep their flat background unless the user picked a workspace wallpaper.
+    return walls.workspace ? (
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <WorkspaceWallpaper wallpaper={walls.workspace} parallax={parallax} />
+      </div>
+    ) : null
+  }
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden" style={{ ['--lamp' as string]: prefs.lamp }}>
-      {/* painted wall */}
+      {/* painted wall, or the user's own wallpaper */}
+      {walls.workspace ? (
+        <WorkspaceWallpaper wallpaper={walls.workspace} parallax={parallax} />
+      ) : (
       <div
         className="absolute inset-0"
         style={{
@@ -68,6 +108,7 @@ export function Environment() {
           backgroundBlendMode: 'normal, soft-light',
         }}
       />
+      )}
       {/* cool moonlight spilling from the window */}
       {windowShown && (
         <div
@@ -91,7 +132,7 @@ export function Environment() {
         <>
           {/* desktop: a tall window beside the content */}
           <div className="absolute top-[7vh] h-[80vh]" style={{ insetInlineEnd: '3vw', width: WINDOW_W }}>
-            <NightWindow rain={prefs.rain} intensity={prefs.rainIntensity} animate={animate} className="h-full w-full" />
+            <NightWindow rain={prefs.rain} intensity={prefs.rainIntensity} animate={animate} parallax={parallax} scenery={walls.window} className="h-full w-full" />
             <DeskLamp />
             {/* sill */}
             <div
@@ -109,7 +150,7 @@ export function Environment() {
       {/* mobile/tablet: the window as an atmospheric band behind the top of the page */}
       {windowShown && !lg && (
           <div className="absolute inset-x-0 top-0 h-[42vh]" style={{ maskImage: 'linear-gradient(180deg, #000 35%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 35%, transparent)' }}>
-            <NightWindow rain={prefs.rain} intensity={prefs.rainIntensity * 0.7} animate={animate} framed={false} className="h-full w-full opacity-70" />
+            <NightWindow rain={prefs.rain} intensity={prefs.rainIntensity * 0.7} animate={animate} scenery={walls.window} framed={false} className="h-full w-full opacity-70" />
           </div>
       )}
     </div>

@@ -463,3 +463,9 @@ body {
 .dw-palette[data-state='closed'] {
   animation: dw-pop-out 0.12s ease-in forwards;
 }
+
+:root.app-hidden *,
+:root.app-hidden *::before,
+:root.app-hidden *::after {
+  animation-play-state: paused !important;
+}

@@ -10,6 +10,7 @@ import type { Category, Task } from '@/domain/types'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { useEffects } from '@/hooks/useMotionLevel'
 
 const PRIORITY_COLOR = { none: '', low: '#6FA563', medium: '#D99A3A', high: '#C4553F' } as const
 
@@ -60,14 +61,15 @@ function TaskRow({
   const swiped = useRef(false)
   const [moving, setMoving] = useState(false)
   const [renaming, setRenaming] = useState(false)
+  const fx = useEffects()
   const moved = !!task.rescheduledTo
   const canToggle = editable && !moved
 
   const toggle = () => {
     if (!canToggle) return
-    if (!task.completed) {
+    if (!task.completed && fx.completion) {
       setBurst((b) => b + 1)
-      if (level !== 'off') void box.start({ scale: [1, 0.82, 1.12, 1], transition: { duration: level === 'full' ? 0.42 : 0.15 } })
+      void box.start({ scale: [1, 0.84, 1.1, 0.98, 1], transition: { duration: level === 'full' ? 0.5 : 0.18, ease: 'easeOut' } })
     }
     onToggle(task)
   }
@@ -137,7 +139,7 @@ function TaskRow({
           >
             <HandCheck checked={task.completed} level={level} className="size-5" />
           </motion.button>
-          {level === 'full' && <Sparkles key={burst} active={burst > 0} />}
+          {fx.completion && fx.amp > 0 && <Sparkles key={burst} active={burst > 0} count={fx.amp === 1 ? 7 : 4} />}
         </div>
 
         {renaming ? (
@@ -256,19 +258,19 @@ function Meta({ task, category, moved }: { task: Task; category?: Category; move
 }
 
 /** A handful of tiny ink stars that pop out of the checkbox. Purely decorative. */
-function Sparkles({ active }: { active: boolean }) {
+function Sparkles({ active, count = 7 }: { active: boolean; count?: number }) {
   return (
     <AnimatePresence>
       {active && (
         <span aria-hidden className="pointer-events-none absolute inset-0">
-          {Array.from({ length: 7 }, (_, i) => {
-            const a = (i / 7) * Math.PI * 2 + 0.4
+          {Array.from({ length: count }, (_, i) => {
+            const a = (i / count) * Math.PI * 2 + 0.4
             const r = 20 + (i % 3) * 5
             return (
               <motion.span
                 key={i}
                 className="absolute top-1/2 left-1/2 block size-1.5 rounded-full"
-                style={{ background: ['#E0A526', '#E37A6B', '#6FA563', '#8C7AD6'][i % 4], marginLeft: -3, marginTop: -3 }}
+                style={{ background: ['#F2C14E', '#E8AD67', '#F6D58B', '#E39A4F'][i % 4], marginLeft: -3, marginTop: -3, boxShadow: '0 0 4px rgb(242 193 78 / 0.7)' }}
                 initial={{ x: 0, y: 0, scale: 0.4, opacity: 1 }}
                 animate={{ x: Math.cos(a) * r, y: Math.sin(a) * r, scale: [0.4, 1.1, 0], opacity: [1, 1, 0] }}
                 transition={{ duration: 0.6, ease: 'easeOut', delay: 0.05 }}
