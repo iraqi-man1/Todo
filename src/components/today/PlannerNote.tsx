@@ -9,13 +9,13 @@ import {
 } from '@dnd-kit/core'
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Check, ChevronDown, Eye, EyeOff, MoreHorizontal, Palette, Plus, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { CalendarDays, Check, ChevronDown, Clock, Flag, Eye, EyeOff, MoreHorizontal, Palette, Plus, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
 import { DoneStamp } from '@/components/paper/DoneStamp'
 import { PaperPhysics } from '@/components/paper/PaperPhysics'
 import { useEffects } from '@/hooks/useMotionLevel'
 import { useCollection } from '@/hooks/useCollection'
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Paper } from '@/components/paper/StickyNote'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import {
@@ -33,6 +33,10 @@ import { NOTE_COLORS, type Category, type DayNote, type Goal, type Task } from '
 import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { parseQuickAdd } from '@/lib/quickAdd'
+import { addDaysKey } from '@/lib/dates'
+import { useToday } from '@/hooks/useToday'
+import { toast } from 'sonner'
 import { useUI } from '@/store/ui'
 import { percent } from '@/domain/summary'
 import { TaskItem } from './TaskItem'
@@ -272,21 +276,36 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
 
 const AddTaskInput = forwardRef<HTMLInputElement, { noteId: string; date: string; onError: (e: unknown) => void }>(
   function AddTaskInput({ noteId, date, onError }, ref) {
-    const { d } = useI18n()
+    const { d, f, date: fmtDate } = useI18n()
     const [value, setValue] = useState('')
     const openEditor = useUI((s) => s.openEditor)
+    const navigate = useUI((s) => s.navigate)
+    const today = useToday()
+    const parsed = useMemo(() => (value.trim() ? parseQuickAdd(value, today) : null), [value, today])
+    const dayLabel = (key: string) => (key === today ? d.quickAdd.today : key === addDaysKey(today, 1) ? d.quickAdd.tomorrow : fmtDate(key, 'medium'))
     const submit = async () => {
-      const title = value.trim()
-      if (!title) return
+      const raw = value.trim()
+      if (!raw) return
+      const q = parseQuickAdd(raw, today)
+      const target = q.date ?? date
       setValue('')
       try {
-        await uAddTask(date, { title }, { noteId })
+        const input = { title: q.title, ...(q.dueTime && { dueTime: q.dueTime }), ...(q.priority && { priority: q.priority }) }
+        if (target === date) await uAddTask(date, input, { noteId })
+        else {
+          await uAddTask(target, input)
+          toast.success(f(d.quickAdd.addedTo, { date: dayLabel(target) }), {
+            action: { label: d.quickAdd.open, onClick: () => navigate({ name: 'today', date: target }) },
+          })
+        }
       } catch (e) {
-        setValue(title)
+        setValue(raw)
         onError(e)
       }
     }
+    const chips = parsed && (parsed.date || parsed.dueTime || parsed.priority) && parsed.title !== value.trim()
     return (
+      <>
       <form
         className="mt-1 flex items-center gap-1.5 ps-1"
         onSubmit={(e) => {
@@ -304,6 +323,8 @@ const AddTaskInput = forwardRef<HTMLInputElement, { noteId: string; date: string
           onKeyDown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
           placeholder={d.today.addPlaceholder}
           aria-label={d.today.addTask}
+          aria-describedby={chips ? `qa-${noteId}` : undefined}
+          title={d.quickAdd.hint}
           enterKeyHint="done"
           maxLength={200}
           className="h-11 min-w-0 flex-1 bg-transparent text-[15px] text-[#302c28] placeholder:text-[#302c28]/45 focus:outline-none"
@@ -320,6 +341,30 @@ const AddTaskInput = forwardRef<HTMLInputElement, { noteId: string; date: string
           <SlidersHorizontal className="size-4" />
         </button>
       </form>
+      {/* live preview of what the smart parser understood */}
+      {chips && (
+        <p id={`qa-${noteId}`} aria-live="polite" className="ms-[3.25rem] -mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-[12px] font-medium text-[#302c28]/70">
+          {parsed.date && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.06] px-2 py-0.5">
+              <CalendarDays className="size-3.5" />
+              {dayLabel(parsed.date)}
+            </span>
+          )}
+          {parsed.dueTime && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.06] px-2 py-0.5 tabular-nums">
+              <Clock className="size-3.5" />
+              {parsed.dueTime}
+            </span>
+          )}
+          {parsed.priority && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#C2453A]/12 px-2 py-0.5 text-[#9C2F25]">
+              <Flag className="size-3.5" />
+              {d.quickAdd.urgent}
+            </span>
+          )}
+        </p>
+      )}
+      </>
     )
   },
 )

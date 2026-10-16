@@ -30,9 +30,10 @@ interface Palette {
 
 const PALETTES: Record<SkyPhase, Palette> = {
   night: { sky: ['#0A111E', '#152238', '#24324B', '#3A3A4A'], stars: 0.55, body: 'moon', cloud: ['#3B4862', 0.55], far: '#18233A', near: '#0E1626', lights: 1, glow: 0.16, haze: ['#3A3E52', 0.55], trees: '#080D17' },
-  dawn: { sky: ['#1F2A4A', '#5A5A86', '#C98C8C', '#F2C29A'], stars: 0.22, body: 'lowsun', cloud: ['#E3AFA6', 0.5], far: '#3E4262', near: '#262B46', lights: 0.45, glow: 0.1, haze: ['#F2C29A', 0.32], trees: '#161A2A' },
+  // Dawn: cool and pale, a soft pink horizon, lights going out. Dusk: deep warm reds, silhouettes, lights coming on.
+  dawn: { sky: ['#5B6E9E', '#9AA6CC', '#E7B9C4', '#FBE1C8'], stars: 0.08, body: 'lowsun', cloud: ['#F6D3D8', 0.6], far: '#7C85A8', near: '#525B80', lights: 0.18, glow: 0.04, haze: ['#FBE1C8', 0.38], trees: '#3A4060' },
   day: { sky: ['#3F7FC2', '#6FA6DB', '#A9CFEE', '#D8EAF6'], stars: 0, body: 'sun', cloud: ['#FFFFFF', 0.78], far: '#8195AF', near: '#52637C', lights: 0.05, glow: 0, haze: ['#DCEBF6', 0.45], trees: '#2E3C3C' },
-  dusk: { sky: ['#18203E', '#4A3E6E', '#B4607A', '#F09A6A'], stars: 0.3, body: 'lowsun', cloud: ['#C27E8C', 0.5], far: '#3B2F50', near: '#1F1A31', lights: 0.8, glow: 0.2, haze: ['#F09A6A', 0.3], trees: '#120F1C' },
+  dusk: { sky: ['#241A3E', '#5E2F5A', '#C24A3E', '#F28A2E'], stars: 0.25, body: 'lowsun', cloud: ['#8E3A4A', 0.55], far: '#3A1F38', near: '#1A1020', lights: 0.9, glow: 0.28, haze: ['#F28A2E', 0.36], trees: '#0E0812' },
 }
 
 const TREE_TINT: Record<Season, [string, number]> = { winter: ['#EEF3F8', 0.55], spring: ['#5E9E4A', 0.28], summer: ['#3E6E3A', 0.18], autumn: ['#C2601E', 0.42] }
@@ -63,7 +64,8 @@ const NightScene = memo(function NightScene({ moonY = 120, phase = 'night', seas
   const p = PALETTES[phase]
   const tint = TREE_TINT[season]
   const trees = 'M0 600 V560 q12 -22 26 -6 q10 -30 28 -8 q14 -18 26 4 q8 -10 18 2 V600 Z M300 600 V572 q14 -26 30 -8 q12 -24 30 -2 q16 -20 26 6 q8 -6 14 2 V600 Z'
-  const sunX = p.body === 'lowsun' ? (phase === 'dawn' ? 90 : 120) : 295
+  // The sun rises on the right (east) and sets on the left.
+  const sunX = p.body === 'lowsun' ? (phase === 'dawn' ? 300 : 100) : 295
   const sunY = p.body === 'lowsun' ? moonY + 230 : moonY
   return (
     <svg viewBox="0 0 400 600" preserveAspectRatio="xMidYMax slice" className="absolute inset-0 h-full w-full scale-[1.06]" data-phase={phase} data-season={season}>
@@ -80,8 +82,8 @@ const NightScene = memo(function NightScene({ moonY = 120, phase = 'night', seas
           <stop offset="1" stopColor="#C9D3E6" stopOpacity="0" />
         </radialGradient>
         <radialGradient id={`dw-sunglow-${phase}`}>
-          <stop offset="0" stopColor={phase === 'day' ? '#FFFBE8' : '#FFD9A0'} stopOpacity="0.9" />
-          <stop offset="0.3" stopColor={phase === 'day' ? '#FFF2C2' : '#F6A86A'} stopOpacity="0.35" />
+          <stop offset="0" stopColor={phase === 'day' ? '#FFFBE8' : phase === 'dawn' ? '#FFF1D6' : '#FFB070'} stopOpacity="0.9" />
+          <stop offset="0.3" stopColor={phase === 'day' ? '#FFF2C2' : phase === 'dawn' ? '#F9CFC0' : '#E8562E'} stopOpacity="0.35" />
           <stop offset="1" stopColor="#FFE8B0" stopOpacity="0" />
         </radialGradient>
         <radialGradient id={`dw-cloud-${phase}`}>
@@ -117,7 +119,7 @@ const NightScene = memo(function NightScene({ moonY = 120, phase = 'night', seas
         ) : (
           <>
             <circle cx={sunX} cy={sunY} r={p.body === 'sun' ? 110 : 130} fill={`url(#dw-sunglow-${phase})`} />
-            <circle cx={sunX} cy={sunY} r={p.body === 'sun' ? 17 : 24} fill={p.body === 'sun' ? '#FFF8E2' : '#FFC88A'} opacity={p.body === 'sun' ? 1 : 0.92} />
+            <circle cx={sunX} cy={sunY} r={p.body === 'sun' ? 17 : phase === 'dawn' ? 20 : 28} fill={p.body === 'sun' ? '#FFF8E2' : phase === 'dawn' ? '#FFE9C4' : '#FF8A4C'} opacity={p.body === 'sun' ? 1 : 0.92} />
           </>
         )}
       </g>

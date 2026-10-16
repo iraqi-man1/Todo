@@ -1,3 +1,4 @@
+import { WelcomeTour } from '@/components/onboarding/WelcomeTour'
 import { useEffect, useState } from 'react'
 import { MotionConfig } from 'motion/react'
 import { Toaster } from 'sonner'
@@ -97,6 +98,7 @@ export default function App() {
       <TooltipProvider delayDuration={450} skipDelayDuration={200}>
       <AppShell />
       <PwaPrompt />
+      <WelcomeTour />
       <Toaster
         position="top-center"
         theme={dark ? 'dark' : 'light'}

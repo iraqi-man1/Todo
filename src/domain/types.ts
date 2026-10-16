@@ -213,6 +213,11 @@ export interface Prefs {
   /** Window weather and sky */
   weather: WeatherPref
   sky: SkyPref
+  /** The first-run tour has been seen (or skipped). */
+  onboarded: boolean
+  /** Short vibrations on phones for checks and pins. */
+  haptics: boolean
+  printPaper: 'A4' | 'A3'
   updatedAt: number
 }
 
@@ -277,6 +282,9 @@ export const DEFAULT_PREFS: Prefs = {
   stampStyle: 'classic',
   weather: 'auto',
   sky: 'live',
+  onboarded: false,
+  haptics: true,
+  printPaper: 'A4',
   updatedAt: 0,
 }
 
@@ -292,5 +300,7 @@ export function migratePrefs(raw: Partial<Prefs> | undefined): Prefs {
     }
     Object.assign(p, map[raw.motion] ?? {})
   }
+  // People who used the app before the tour existed don't need it.
+  if (raw && raw.onboarded === undefined) p.onboarded = true
   return p
 }

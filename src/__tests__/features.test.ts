@@ -110,3 +110,27 @@ describe('sky', () => {
     expect(weatherFor('rain', 'winter')).toBe('rain')
   })
 })
+
+describe('first run', () => {
+  it('shows the tour to new users only', async () => {
+    const { migratePrefs } = await import('@/domain/types')
+    expect(migratePrefs(undefined).onboarded).toBe(false)
+    expect(migratePrefs({ theme: 'light' }).onboarded).toBe(true)
+    expect(migratePrefs({ onboarded: false }).onboarded).toBe(false)
+  })
+})
+
+describe('haptics', () => {
+  it('vibrates only when enabled and supported', async () => {
+    const { haptic } = await import('@/lib/haptics')
+    const { usePrefs } = await import('@/store/prefs')
+    const vibrate = vi.fn()
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true })
+    usePrefs.getState().update({ haptics: true })
+    haptic('pin')
+    expect(vibrate).toHaveBeenCalledTimes(1)
+    usePrefs.getState().update({ haptics: false })
+    haptic('pin')
+    expect(vibrate).toHaveBeenCalledTimes(1)
+  })
+})

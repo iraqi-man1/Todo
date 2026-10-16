@@ -296,8 +296,130 @@ function MiniSlot(p: BoardProps & { date: DateKey }) {
       </span>
     )
   return (
-    <span className={cn('chalk grid size-[30px] place-items-center rounded-[2px] text-[10px] font-medium opacity-60', status === 'today' && 'ring-1 ring-[rgb(255_248_235/0.6)] opacity-100')}>
+    <span className={cn('chalk grid size-[30px] place-items-center rounded-[2px] text-[10px] font-medium opacity-80', status === 'today' && 'ring-1 ring-[rgb(255_248_235/0.6)] opacity-100')}>
       {fromKey(p.date).getDate()}
     </span>
+  )
+}
+
+/** Wood tones from pale honey to deep walnut: the more you got done, the darker the square. */
+const HEAT = ['#EAD7B0', '#D9B27A', '#B9824A', '#8C5A2E', '#5E3A1C']
+const CELL = 14
+const GAP = 3
+
+function heatLevel(s: DaySummary | undefined): number {
+  if (!s || s.total === 0) return -1
+  if (s.complete) return 4
+  return Math.min(3, Math.floor((s.percentage / 100) * 4))
+}
+
+/**
+ * The year as a heatmap: one square per day in week columns, shaded in wood tones by how much of
+ * the day got done. Pinned days carry a brass dot; a square opens its note, or its month.
+ */
+export function YearHeatmap(p: BoardProps) {
+  const { d, f, date } = useI18n()
+  const year = fromKey(p.anchor).getFullYear()
+  const { weeks, monthCols } = useMemo(() => {
+    const first = new Date(year, 0, 1)
+    const start = new Date(year, 0, 1 - ((first.getDay() - p.weekStartsOn + 7) % 7))
+    const weeks: (DateKey | null)[][] = []
+    const monthCols: { col: number; key: DateKey }[] = []
+    for (let c = 0; ; c++) {
+      const col: (DateKey | null)[] = []
+      for (let r = 0; r < 7; r++) {
+        const day = new Date(start.getFullYear(), start.getMonth(), start.getDate() + c * 7 + r)
+        if (day.getFullYear() !== year) col.push(null)
+        else {
+          col.push(toKey(day))
+          if (day.getDate() === 1) monthCols.push({ col: c, key: toKey(day) })
+        }
+      }
+      if (col.every((k) => k === null) && c > 0) break
+      weeks.push(col)
+    }
+    return { weeks, monthCols }
+  }, [year, p.weekStartsOn])
+  const stats = useMemo(() => rangeStats(p.summaries, weeks.flat().filter((k): k is DateKey => !!k)), [p.summaries, weeks])
+  const labelW = 34
+  const order = weekdayOrder(p.weekStartsOn)
+
+  return (
+    <Board padding={p.narrow ? 24 : 48}>
+      <WoodenMonthPlaque title={String(year)} subtitle={`${f(d.wall.completedDays, { n: stats.completedDays })} · ${stats.percentage}%`} className="mb-8" />
+      <PageTurn pageKey={`heat-${year}`} dirn={p.dirn} level={p.level}>
+        <div className="rounded-lg bg-[rgb(255_248_235/0.1)] p-4 shadow-[inset_0_1px_3px_rgb(0_0_0/0.35)]">
+          {/* month labels */}
+          <div className="relative mb-1.5 h-4" style={{ marginInlineStart: labelW, width: weeks.length * (CELL + GAP) }}>
+            {monthCols.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => p.onPickMonth?.(m.key)}
+                className="engraved absolute top-0 text-[11px] font-semibold hover:underline"
+                style={{ insetInlineStart: m.col * (CELL + GAP) }}
+              >
+                {date(m.key, 'monthShort')}
+              </button>
+            ))}
+          </div>
+          <div className="flex">
+            {/* weekday labels: every other row keeps it airy */}
+            <div className="grid shrink-0" style={{ width: labelW, gridTemplateRows: `repeat(7, ${CELL}px)`, rowGap: GAP }}>
+              {order.map((wd, i) => (
+                <span key={wd} className="engraved text-[10px] leading-[14px] font-semibold">
+                  {i % 2 === 0 ? date(new Date(2024, 0, 7 + wd), 'weekdayShort') : ''}
+                </span>
+              ))}
+            </div>
+            <div className="flex" style={{ gap: GAP }} role="grid" aria-label={f(d.wall.heatmapLabel, { year })}>
+              {weeks.map((col, c) => (
+                <div key={c} className="grid" style={{ gridTemplateRows: `repeat(7, ${CELL}px)`, rowGap: GAP }} role="row">
+                  {col.map((k, r) => {
+                    if (!k) return <span key={r} style={{ width: CELL, height: CELL }} />
+                    const s = p.summaries.get(k)
+                    const lvl = heatLevel(s)
+                    const pinned = p.archives.has(k)
+                    const status = slotStatus(k, s, p.today)
+                    const dim = dimmedFor(status, p.filter)
+                    const label = s && s.total > 0 ? `${date(k, 'medium')}: ${f(d.wall.tasksDone, { done: s.completed, total: s.total })} · ${s.percentage}%` : date(k, 'medium')
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        role="gridcell"
+                        title={label}
+                        aria-label={label}
+                        onClick={(e) => (pinned ? p.onOpen(k, e.currentTarget, 0) : p.onPickMonth?.(k))}
+                        className={cn(
+                          'relative rounded-[3px] transition-transform hover:scale-125 focus-visible:scale-125 focus-visible:outline-2 focus-visible:outline-[#FFF3D6]',
+                          lvl < 0 && 'shadow-[inset_0_0_0_1px_rgb(255_248_235/0.22)]',
+                          k === p.today && 'outline outline-1.5 outline-offset-1 outline-[#FFF3D6]',
+                          dim && 'opacity-30',
+                        )}
+                        style={{ width: CELL, height: CELL, background: lvl < 0 ? 'rgb(255 248 235 / 0.06)' : HEAT[lvl], boxShadow: lvl >= 0 ? '0 1px 1px rgb(0 0 0 / 0.3)' : undefined }}
+                      >
+                        {pinned && <span aria-hidden className="absolute top-1/2 left-1/2 size-[5px] -translate-1/2 rounded-full bg-[#E9C77B] shadow-[0_0_0_1px_rgb(80_50_20/0.5)]" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* legend */}
+          <div className="engraved mt-3 flex items-center justify-end gap-1.5 text-[11px] font-semibold">
+            <span>{d.wall.heatLess}</span>
+            {HEAT.map((c) => (
+              <span key={c} className="rounded-[3px]" style={{ width: CELL, height: CELL, background: c }} />
+            ))}
+            <span>{d.wall.heatMore}</span>
+            <span className="ms-3 inline-flex items-center gap-1">
+              <span className="size-[7px] rounded-full bg-[#E9C77B]" /> {d.wall.pinnedLegend}
+            </span>
+          </div>
+        </div>
+      </PageTurn>
+    </Board>
   )
 }

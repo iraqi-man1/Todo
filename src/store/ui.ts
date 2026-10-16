@@ -47,7 +47,9 @@ interface UIState {
   wallView: WallView
   wallAnchor: DateKey | null
   wallFilter: WallFilter
-  setWall: (p: Partial<Pick<UIState, 'wallView' | 'wallAnchor' | 'wallFilter'>>) => void
+  /** Year view as pinned notes or as a heatmap. */
+  yearStyle: 'notes' | 'heat'
+  setWall: (p: Partial<Pick<UIState, 'wallView' | 'wallAnchor' | 'wallFilter' | 'yearStyle'>>) => void
   /** Ask the wall to centre a date's note (e.g. "go to today"). `tick` makes repeats re-trigger. */
   wallFocus: { date: DateKey; tick: number } | null
   requestWallFocus: (date: DateKey) => void
@@ -89,7 +91,9 @@ export const useUI = create<UIState>((set) => ({
   wallView: readChoice('dw-wall-view', ['day', 'week', 'month', 'year', 'goals'] as const, 'month'),
   wallAnchor: null,
   wallFilter: readChoice('dw-wall-filter', ['all', 'complete', 'incomplete'] as const, 'all'),
+  yearStyle: readChoice('dw-year-style', ['notes', 'heat'] as const, 'notes'),
   setWall: (p) => {
+    if (p.yearStyle) writeChoice('dw-year-style', p.yearStyle)
     if (p.wallView) writeChoice('dw-wall-view', p.wallView)
     if (p.wallFilter) writeChoice('dw-wall-filter', p.wallFilter)
     set(p)

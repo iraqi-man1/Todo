@@ -65,6 +65,8 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
 ) {
   const outer = useRef<HTMLDivElement>(null)
   const inner = useRef<HTMLDivElement>(null)
+  /** True while the view is the automatic fit, i.e. the user hasn't moved it yet. */
+  const autoFit = useRef(false)
   const x = useMotionValue(0)
   const y = useMotionValue(0)
   const s = useMotionValue(1)
@@ -159,11 +161,13 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
     ref,
     () => ({
       zoomBy: (factor) => {
+        autoFit.current = false
         const { cw, ch } = sizes()
         zoomAt(cw / 2, ch / 2, s.get() * factor, true)
       },
       reset: (animated = true) => {
         if (persist) writeSaved(fitKey, null)
+        autoFit.current = true
         fitView(animated)
       },
       cancelGesture: () => {
@@ -172,9 +176,13 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
         gesture.current.mode = 'idle'
         dragged.current = true
       },
-      pan: (dx, dy) => go(x.get() + dx, y.get() + dy, s.get(), true),
+      pan: (dx, dy) => {
+        autoFit.current = false
+        go(x.get() + dx, y.get() + dy, s.get(), true)
+      },
       scale: () => s.get(),
       focusElement: (el, opts = {}) => {
+        autoFit.current = false
         const i = inner.current!
         const { cw, ch } = sizes()
         // Offsets relative to the unscaled board
@@ -202,6 +210,7 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
     const first = fitted.current === null
     fitted.current = fitKey
     const saved = persist ? readSaved()[fitKey] : undefined
+    autoFit.current = !saved
     if (saved) go(saved.x, saved.y, clamp(saved.s, MIN, MAX), false)
     else fitView(!first)
   }, [fitKey, fitView, go, persist])
@@ -229,9 +238,11 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
     }
   }, [fitKey, persist, s, x, y])
 
-  // Keep the board sensible when the window or board size changes.
+  // Keep the board sensible when the window or board size changes. Until the user pans or zooms,
+  // keep it fitted: boards whose content loads late (goals) would otherwise stay mis-framed.
   useEffect(() => {
     const ro = new ResizeObserver(() => {
+      if (autoFit.current) return fitView(false)
       const b = bounds(s.get())
       x.set(clamp(x.get(), b.minX, b.maxX))
       y.set(clamp(y.get(), b.minY, b.maxY))
@@ -239,13 +250,14 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
     if (outer.current) ro.observe(outer.current)
     if (inner.current) ro.observe(inner.current)
     return () => ro.disconnect()
-  }, [bounds, s, x, y])
+  }, [bounds, fitView, s, x, y])
 
   // Wheel must be non-passive to prevent page zoom/scroll.
   useEffect(() => {
     const el = outer.current!
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
+      autoFit.current = false
       const r = el.getBoundingClientRect()
       if (!e.ctrlKey && (Math.abs(e.deltaX) > 0.5 || e.shiftKey)) {
         go(x.get() - e.deltaX, y.get() - (e.shiftKey ? 0 : e.deltaY), s.get(), false)
@@ -285,6 +297,7 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
+    autoFit.current = false
     stop()
     const p = local(e)
     pointers.current.set(e.pointerId, p)

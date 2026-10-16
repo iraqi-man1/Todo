@@ -1,5 +1,5 @@
 import { addMonths, addWeeks, addYears } from 'date-fns'
-import { CalendarCheck, ChevronLeft, ChevronRight, Filter, Maximize2, Minus, Plus, Printer, Search } from 'lucide-react'
+import { CalendarCheck, ChevronLeft, ChevronRight, Filter, Maximize2, Minus, MoreHorizontal, Plus, Printer, Search } from 'lucide-react'
 import { AnimatePresence, motion, useTransform, type MotionValue } from 'motion/react'
 import { Tip } from '@/components/ui/tooltip'
 import { setArchiveOffset } from '@/domain/actions'
@@ -8,10 +8,10 @@ import { goToToday } from '@/hooks/useShortcuts'
 import { WallGestureContext, type Offset, type WallGesture } from './drag'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Segmented } from '@/components/ui/fields'
 import type { Archive, DateKey } from '@/domain/types'
-import { useArchives, useMoods, useSummaries } from '@/hooks/useData'
+import { useArchives, useGoals, useMoods, useSummaries } from '@/hooks/useData'
 import { dur, useMotionLevel } from '@/hooks/useMotionLevel'
 import { useToday } from '@/hooks/useToday'
 import { addDaysKey, fromKey, isoWeek, toKey, weekDays } from '@/lib/dates'
@@ -20,11 +20,13 @@ import { cn, isTypingTarget } from '@/lib/utils'
 import { usePrefs } from '@/store/prefs'
 import { useUI, type WallFilter, type WallView } from '@/store/ui'
 import { PrintWall } from './PrintWall'
-import { DayBoard, MonthBoard, WeekBoard, YearBoard, type BoardProps } from './Boards'
+import { DayBoard, MonthBoard, WeekBoard, YearBoard, YearHeatmap, type BoardProps } from './Boards'
 import { WallSearch } from './WallSearch'
 import { GoalsBoard } from '@/components/goals/GoalsBoard'
 import { useCollection } from '@/hooks/useCollection'
 import { WallViewport, type WallViewportHandle } from './WallViewport'
+
+const PAPERS = ['A4', 'A3'] as const
 
 function useNarrow() {
   const [narrow, setNarrow] = useState(() => window.innerWidth < 640)
@@ -36,6 +38,19 @@ function useNarrow() {
   return narrow
 }
 
+/** Width of an element, tracked with a ResizeObserver. */
+function useWidth(ref: React.RefObject<HTMLElement | null>) {
+  const [w, setW] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return w
+}
+
 export function WoodenWall() {
   const { d, f, date } = useI18n()
   const today = useToday()
@@ -45,6 +60,7 @@ export function WoodenWall() {
   const view = useUI((s) => s.wallView)
   const anchorState = useUI((s) => s.wallAnchor)
   const filter = useUI((s) => s.wallFilter)
+  const yearStyle = useUI((s) => s.yearStyle)
   const setWall = useUI((s) => s.setWall)
   const justPinned = useUI((s) => s.justPinned)
   const setJustPinned = useUI((s) => s.setJustPinned)
@@ -64,8 +80,14 @@ export function WoodenWall() {
   const ready = !!archivesList && !!summaries
 
   const [dirn, setDirn] = useState(0)
-  const [printing, setPrinting] = useState(false)
-  const endPrint = useCallback(() => setPrinting(false), [])
+  const [printing, setPrinting] = useState<'A4' | 'A3' | null>(null)
+  const endPrint = useCallback(() => setPrinting(null), [])
+  // the last paper size used comes first
+  const papers = [...PAPERS].sort((a) => (a === prefs.printPaper ? -1 : 1))
+  const startPrint = (size: 'A4' | 'A3') => {
+    usePrefs.getState().update({ printPaper: size })
+    setPrinting(size)
+  }
   const wallFocus = useUI((s) => s.wallFocus)
   const shift = (n: number) => {
     setDirn(n)
@@ -88,7 +110,13 @@ export function WoodenWall() {
 
   const periodKey =
     view === 'goals' ? 'all' : view === 'day' ? anchor : view === 'week' ? weekDays(anchor, prefs.weekStartsOn)[0] : view === 'month' ? anchor.slice(0, 7) : anchor.slice(0, 4)
-  const fitKey = `${view}|${periodKey}|${narrow}`
+  const wallBox = useRef<HTMLDivElement>(null)
+  const wallW = useWidth(wallBox)
+  // Goal cards stay readable: as many columns as fit at full size, never shrunk to a thumbnail.
+  const goalCols = narrow ? 1 : wallW >= 1180 ? 3 : 2
+  // Goals load asynchronously and change the board's height, so their count is part of the fit.
+  const goalCount = useGoals()?.length ?? -1
+  const fitKey = `${view}|${periodKey}|${narrow}|${view === 'goals' ? `${goalCols}|${goalCount}` : view === 'year' ? yearStyle : ''}`
 
   // Zoom toward a freshly pinned note once the board is laid out.
   useEffect(() => {
@@ -243,6 +271,16 @@ export function WoodenWall() {
           </Tip>
         </div>
         <div className="ms-auto flex items-center gap-1">
+          {view === 'year' && (
+            <Segmented
+              label={d.wall.yearStyle}
+              value={yearStyle}
+              onChange={(v) => setWall({ yearStyle: v })}
+              size="sm"
+              options={(['notes', 'heat'] as const).map((v) => ({ value: v, label: d.wall.yearStyles[v] }))}
+              className="hidden sm:flex"
+            />
+          )}
           {anchor !== today && view !== 'goals' && (
             <Button
               variant="subtle"
@@ -255,6 +293,42 @@ export function WoodenWall() {
               {d.wall.today}
             </Button>
           )}
+          {/* phones: filter and print share one menu so the toolbar stays on one line */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="iconSm" aria-label={d.wall.more} className={cn('sm:hidden', filter !== 'all' && 'bg-note-yellow text-[#302c28]')}>
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{d.wall.filter}</DropdownMenuLabel>
+              {filters.map((fl) => (
+                <DropdownMenuItem key={fl} onSelect={() => setWall({ wallFilter: fl })} aria-checked={filter === fl} role="menuitemradio">
+                  <span className={cn('size-2 rounded-full', filter === fl ? 'bg-accent' : 'bg-transparent')} />
+                  {d.wall.filters[fl]}
+                </DropdownMenuItem>
+              ))}
+              {view === 'year' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>{d.wall.yearStyle}</DropdownMenuLabel>
+                  {(['notes', 'heat'] as const).map((v) => (
+                    <DropdownMenuItem key={v} onSelect={() => setWall({ yearStyle: v })} aria-checked={yearStyle === v} role="menuitemradio">
+                      <span className={cn('size-2 rounded-full', yearStyle === v ? 'bg-accent' : 'bg-transparent')} />
+                      {d.wall.yearStyles[v]}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+              <DropdownMenuSeparator />
+              {papers.map((size) => (
+                <DropdownMenuItem key={size} onSelect={() => startPrint(size)} disabled={!boardProps || !!printing}>
+                  <Printer /> {f(d.print.paper, { size })}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <span className="hidden items-center gap-1 sm:flex">
           <DropdownMenu>
             <Tip label={`${d.wall.filter}: ${d.wall.filters[filter]}`}>
               <DropdownMenuTrigger asChild>
@@ -272,11 +346,23 @@ export function WoodenWall() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Tip label={d.print.hint}>
-            <Button variant="ghost" size="iconSm" onClick={() => setPrinting(true)} disabled={!boardProps || printing} aria-label={d.print.button}>
-              <Printer />
-            </Button>
-          </Tip>
+          <DropdownMenu>
+            <Tip label={d.print.hint}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="iconSm" disabled={!boardProps || !!printing} aria-label={d.print.button}>
+                  <Printer />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tip>
+            <DropdownMenuContent align="end">
+              {papers.map((size) => (
+                <DropdownMenuItem key={size} onSelect={() => startPrint(size)}>
+                  <Printer /> {f(d.print.paper, { size })}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          </span>
           <Tip label={d.wall.search} shortcut="/">
             <Button variant="ghost" size="iconSm" onClick={() => setSearchOpen(true)} aria-label={d.wall.search}>
               <Search />
@@ -286,14 +372,14 @@ export function WoodenWall() {
       </div>
 
       {/* Wall */}
-      <div className="relative min-h-0 flex-1">
+      <div ref={wallBox} className="relative min-h-0 flex-1">
         {boardProps && (
           <WallGestureContext.Provider value={gesture}>
             <WallViewport
               ref={vp}
               persist
               fitKey={fitKey}
-              fit={(view === 'year' || view === 'month') && narrow ? 'width' : 'contain'}
+              fit={((view === 'year' || view === 'month') && narrow) || view === 'goals' ? 'width' : 'contain'}
               level={level}
               label={`${d.wall.title}: ${periodLabel}`}
               overlay={(scale) => (
@@ -311,7 +397,7 @@ export function WoodenWall() {
               {/* The board stays put across periods (pages turn inside it); only a view change swaps it. */}
               <AnimatePresence mode="popLayout" initial={false}>
                 <motion.div
-                  key={`${view}|${narrow}`}
+                  key={`${view}|${narrow}|${view === 'year' ? yearStyle : ''}`}
                   initial={level === 'off' ? false : { opacity: 0, scale: level === 'full' ? 0.975 : 1 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={level === 'off' ? undefined : { opacity: 0, transition: { duration: 0.14 } }}
@@ -319,9 +405,9 @@ export function WoodenWall() {
                 >
                   {view === 'month' && <MonthBoard {...boardProps} />}
                   {view === 'week' && <WeekBoard {...boardProps} />}
-                  {view === 'year' && <YearBoard {...boardProps} />}
+                  {view === 'year' && (yearStyle === 'heat' ? <YearHeatmap {...boardProps} /> : <YearBoard {...boardProps} />)}
                   {view === 'day' && <DayBoard {...boardProps} />}
-                  {view === 'goals' && <GoalsBoard narrow={narrow} level={level} />}
+                  {view === 'goals' && <GoalsBoard narrow={narrow} cols={goalCols} level={level} />}
                 </motion.div>
               </AnimatePresence>
             </WallViewport>
@@ -331,7 +417,7 @@ export function WoodenWall() {
         <p className="pointer-events-none absolute start-3 bottom-3 hidden rounded-full bg-surface/80 px-3 py-1.5 text-xs text-ink-soft backdrop-blur sm:block">{d.wall.hint}</p>
       </div>
 
-      {printing && boardProps && <PrintWall view={view} props={boardProps} onDone={endPrint} />}
+      {printing && boardProps && <PrintWall view={view} yearStyle={yearStyle} props={boardProps} title={view === 'goals' ? d.goals.title : periodLabel} paper={printing} onDone={endPrint} />}
 
       <WallSearch
         open={searchOpen}

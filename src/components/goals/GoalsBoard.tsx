@@ -16,11 +16,11 @@ import { cn } from '@/lib/utils'
 import { GoalEditor } from './GoalEditor'
 
 /** A section of the wall for big goals: index cards with a brass progress rail. */
-export function GoalsBoard({ narrow, level }: { narrow: boolean; level: MotionLevel }) {
+export function GoalsBoard({ narrow, cols: colsProp, level }: { narrow: boolean; cols?: number; level: MotionLevel }) {
   const { d, f, date } = useI18n()
   const goals = useGoalsWithProgress()
   const [editing, setEditing] = useState<Goal | 'new' | null>(null)
-  const cols = narrow ? 1 : 3
+  const cols = narrow ? 1 : (colsProp ?? 3)
   const achieved = goals?.filter((g) => g.progress.achieved).length ?? 0
 
   return (

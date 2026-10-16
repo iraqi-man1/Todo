@@ -3,6 +3,7 @@
  * triggered by a user action and only when the user has turned sounds on.
  */
 import { usePrefs } from '@/store/prefs'
+import { haptic, type Haptic } from './haptics'
 
 export type SoundName = 'tap' | 'pencil' | 'paper' | 'pin' | 'chime'
 
@@ -51,7 +52,12 @@ function tone(ac: AudioContext, out: AudioNode, at: number, freq: number, dur: n
   o.stop(at + dur + 0.05)
 }
 
+/** Moments that also deserve a little buzz on phones. */
+const HAPTIC: Partial<Record<SoundName, Haptic>> = { pencil: 'tap', pin: 'pin', chime: 'success' }
+
 export function playSound(name: SoundName, force = false) {
+  const h = HAPTIC[name]
+  if (h && !force) haptic(h)
   const { sound, volume } = usePrefs.getState().prefs
   if ((!sound && !force) || volume <= 0) return
   const ac = audio()

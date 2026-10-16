@@ -1,5 +1,5 @@
-import { Moon, Check, Download, HardDrive, Keyboard, Pause, Play, Plus, Trash2, Upload, Volume2, X } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { Moon, Check, Download, HardDrive, Keyboard, Pause, Play, Plus, Search, Trash2, Upload, Volume2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog, Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -16,6 +16,7 @@ import { reportError } from '@/lib/errors'
 import { useI18n } from '@/lib/i18n'
 import { isIos, promptInstall, useInstall } from '@/lib/install'
 import { playSound } from '@/lib/sound'
+import { canVibrate, haptic } from '@/lib/haptics'
 import { startAmbient } from '@/lib/ambient'
 import { WOOD_PALETTES } from '@/lib/textures'
 import { cn } from '@/lib/utils'
@@ -34,10 +35,69 @@ export function SettingsPanel() {
   const prefs = usePrefs((s) => s.prefs)
   const update = usePrefs((s) => s.update)
   const reduce = useReduce()
+  const root = useRef<HTMLDivElement>(null)
+  const [query, setQuery] = useState('')
+  const [sections, setSections] = useState<{ id: string; title: string }[]>([])
+  const [noMatch, setNoMatch] = useState(false)
+
+  // Index: read the section headings once rendered (they follow the language).
+  useEffect(() => {
+    const els = root.current?.querySelectorAll<HTMLElement>('section[data-settings-section]') ?? []
+    setSections([...els].map((el) => ({ id: el.id, title: el.dataset.settingsSection ?? '' })))
+  }, [d])
+
+  // Search: hide rows and sections that don't mention the query. Done on the DOM so every row,
+  // including the nested ones in sub-panels, takes part without extra wiring.
+  useEffect(() => {
+    const q = query.trim().toLocaleLowerCase()
+    let any = false
+    root.current?.querySelectorAll<HTMLElement>('section[data-settings-section]').forEach((sec) => {
+      const titleHit = !q || (sec.dataset.settingsSection ?? '').toLocaleLowerCase().includes(q)
+      let rowHit = false
+      sec.querySelectorAll<HTMLElement>('[data-setting-row]').forEach((row) => {
+        const hit = titleHit || (row.textContent ?? '').toLocaleLowerCase().includes(q)
+        row.hidden = !hit
+        rowHit ||= hit
+      })
+      const show = titleHit || rowHit || (sec.textContent ?? '').toLocaleLowerCase().includes(q)
+      sec.hidden = !show
+      any ||= show
+    })
+    setNoMatch(!!q && !any)
+  }, [query, d])
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pt-[calc(1.25rem+var(--safe-top))] pb-28 sm:px-6 md:pt-10 md:pb-16">
-      <h1 className="mb-5 text-[28px] font-semibold tracking-tight">{d.settings.title}</h1>
+    <div ref={root} className="mx-auto w-full max-w-2xl px-4 pt-[calc(1.25rem+var(--safe-top))] pb-28 sm:px-6 md:pt-10 md:pb-16">
+      <h1 className="mb-4 text-[28px] font-semibold tracking-tight">{d.settings.title}</h1>
+      <div className="sticky top-0 z-10 -mx-4 mb-5 bg-bg/85 px-4 pt-2 pb-2 backdrop-blur-xl sm:-mx-6 sm:px-6">
+        <div className="relative">
+          <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+            placeholder={d.settings.search}
+            aria-label={d.settings.search}
+            className="w-full ps-9"
+          />
+        </div>
+        {!query && (
+          <nav aria-label={d.settings.sections} className="no-scrollbar -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+            {sections.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => document.getElementById(s.id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })}
+                className="shrink-0 rounded-full border border-line bg-surface px-3 py-1 text-[12.5px] font-medium text-ink-soft hover:bg-surface-2 hover:text-ink"
+              >
+                {s.title}
+              </button>
+            ))}
+          </nav>
+        )}
+      </div>
+      {noMatch && <p className="mb-6 px-1 text-center text-sm text-ink-soft">{d.settings.noResults.replace('{q}', query.trim())}</p>}
 
       <Section title={d.settings.profile}>
         <Row label={d.settings.name} htmlFor="pref-name">
@@ -241,6 +301,18 @@ export function SettingsPanel() {
             </Button>
           </div>
         </Row>
+        {canVibrate() && (
+          <Row label={d.settings.haptics} help={d.settings.hapticsHelp}>
+            <Switch
+              checked={prefs.haptics}
+              onCheckedChange={(haptics) => {
+                update({ haptics })
+                if (haptics) setTimeout(() => haptic('success'), 30)
+              }}
+              aria-label={d.settings.haptics}
+            />
+          </Row>
+        )}
       </Section>
 
       <Reminders />
@@ -250,6 +322,18 @@ export function SettingsPanel() {
 
       <Section title={d.settings.about}>
         <InstallRow />
+        <Row label={d.settings.tour}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              update({ onboarded: false })
+              useUI.getState().navigate({ name: 'today' })
+            }}
+          >
+            {d.settings.tourShow}
+          </Button>
+        </Row>
         <Row label={d.settings.shortcuts}>
           <Button variant="secondary" size="sm" onClick={() => useUI.getState().setShortcutsOpen(true)}>
             <Keyboard /> ?
@@ -265,16 +349,19 @@ export function SettingsPanel() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-6">
+    <section className="mb-6 scroll-mt-28" id={`set-${slug(title)}`} data-settings-section={title}>
       <h2 className="mb-2 px-1 text-[13px] font-semibold tracking-wide text-ink-soft uppercase">{title}</h2>
       <div className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-surface shadow-soft">{children}</div>
     </section>
   )
 }
 
+/** A stable id for a heading in any script (Arabic headings keep their letters). */
+const slug = (s: string) => s.trim().toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-')
+
 function Row({ label, children, htmlFor, stacked, help }: { label: string; children: React.ReactNode; htmlFor?: string; stacked?: boolean; help?: string }) {
   return (
-    <div className={cn('px-4 py-3.5', stacked ? 'flex flex-col gap-2.5' : 'flex min-h-14 items-center justify-between gap-4')}>
+    <div data-setting-row className={cn('px-4 py-3.5', stacked ? 'flex flex-col gap-2.5' : 'flex min-h-14 items-center justify-between gap-4')}>
       <div className="min-w-0">
         <label htmlFor={htmlFor} className="text-[15px] font-medium">
           {label}

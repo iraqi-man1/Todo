@@ -13,7 +13,7 @@ import { usePrefs } from '@/store/prefs'
 import { NightWindow } from './NightWindow'
 
 /** Light the window throws into the room at each time of day. */
-const SPILL = { night: 'rgb(120 150 200 / 0.12)', dawn: 'rgb(240 170 140 / 0.14)', day: 'rgb(220 230 245 / 0.16)', dusk: 'rgb(240 150 90 / 0.15)' } as const
+const SPILL = { night: 'rgb(120 150 200 / 0.12)', dawn: 'rgb(235 200 215 / 0.13)', day: 'rgb(220 230 245 / 0.16)', dusk: 'rgb(240 120 60 / 0.17)' } as const
 
 export const WINDOW_W = 'clamp(260px, 26vw, 440px)'
 
@@ -24,8 +24,9 @@ export function useEnvironment() {
   const night = prefs.theme === 'night'
   return {
     night,
-    windowShown: night && prefs.showWindow,
-    animate: night && prefs.ambient && !prefs.focusMode && level === 'full',
+    // The window belongs to every theme; the room around it (navy wall, lamp light) is Cozy Night's.
+    windowShown: prefs.showWindow,
+    animate: prefs.ambient && !prefs.focusMode && level === 'full',
     parallax: fx.parallax && !prefs.focusMode,
   }
 }
@@ -90,11 +91,41 @@ export function Environment() {
   const lg = useMedia('(min-width: 1024px)')
   const walls = useActiveWallpapers()
   const sky = useSky()
+  const windowBlock = (
+    <>
+      {windowShown && lg && (
+        <>
+          {/* desktop: a tall window beside the content */}
+          <div className="absolute top-[7vh] h-[80vh]" style={{ insetInlineEnd: '3vw', width: WINDOW_W }}>
+            <NightWindow rain={prefs.rain} weather={sky.weather} phase={sky.phase} season={sky.season} intensity={prefs.rainIntensity} animate={animate} parallax={parallax} scenery={walls.window} className="h-full w-full" />
+            <DeskLamp />
+            {/* sill */}
+            <div
+              className="absolute -inset-x-4 -bottom-4 h-5 rounded-[3px]"
+              style={{
+                backgroundColor: '#5A3D27',
+                backgroundImage: 'linear-gradient(180deg, rgb(255 220 170 / 0.2), rgb(0 0 0 / 0.3)), var(--wood-texture)',
+                backgroundSize: '100% 100%, 600px 600px',
+                boxShadow: '0 12px 24px -6px rgb(0 0 0 / 0.6)',
+              }}
+            />
+          </div>
+        </>
+      )}
+      {/* mobile/tablet: the window as an atmospheric band behind the top of the page */}
+      {windowShown && !lg && (
+          <div className="absolute inset-x-0 top-0 h-[42vh]" style={{ maskImage: 'linear-gradient(180deg, #000 35%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 35%, transparent)' }}>
+            <NightWindow rain={prefs.rain} weather={sky.weather} phase={sky.phase} season={sky.season} intensity={prefs.rainIntensity * 0.7} animate={animate} scenery={walls.window} framed={false} className="h-full w-full opacity-70" />
+          </div>
+      )}
+    </>
+  )
   if (!night) {
-    // Other themes keep their flat background unless the user picked a workspace wallpaper.
-    return walls.workspace ? (
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <WorkspaceWallpaper wallpaper={walls.workspace} parallax={parallax} />
+    // Other themes keep their flat background (or the user's wallpaper), with the window beside it.
+    return walls.workspace || windowShown ? (
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden" style={{ ['--lamp' as string]: prefs.lamp * 0.6 }}>
+        {walls.workspace && <WorkspaceWallpaper wallpaper={walls.workspace} parallax={parallax} />}
+        {windowBlock}
       </div>
     ) : null
   }
@@ -133,31 +164,7 @@ export function Environment() {
         }}
       />
 
-      {windowShown && lg && (
-        <>
-          {/* desktop: a tall window beside the content */}
-          <div className="absolute top-[7vh] h-[80vh]" style={{ insetInlineEnd: '3vw', width: WINDOW_W }}>
-            <NightWindow rain={prefs.rain} weather={sky.weather} phase={sky.phase} season={sky.season} intensity={prefs.rainIntensity} animate={animate} parallax={parallax} scenery={walls.window} className="h-full w-full" />
-            <DeskLamp />
-            {/* sill */}
-            <div
-              className="absolute -inset-x-4 -bottom-4 h-5 rounded-[3px]"
-              style={{
-                backgroundColor: '#5A3D27',
-                backgroundImage: 'linear-gradient(180deg, rgb(255 220 170 / 0.2), rgb(0 0 0 / 0.3)), var(--wood-texture)',
-                backgroundSize: '100% 100%, 600px 600px',
-                boxShadow: '0 12px 24px -6px rgb(0 0 0 / 0.6)',
-              }}
-            />
-          </div>
-        </>
-      )}
-      {/* mobile/tablet: the window as an atmospheric band behind the top of the page */}
-      {windowShown && !lg && (
-          <div className="absolute inset-x-0 top-0 h-[42vh]" style={{ maskImage: 'linear-gradient(180deg, #000 35%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 35%, transparent)' }}>
-            <NightWindow rain={prefs.rain} weather={sky.weather} phase={sky.phase} season={sky.season} intensity={prefs.rainIntensity * 0.7} animate={animate} scenery={walls.window} framed={false} className="h-full w-full opacity-70" />
-          </div>
-      )}
+      {windowBlock}
     </div>
   )
 }

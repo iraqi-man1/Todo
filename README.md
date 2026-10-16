@@ -22,8 +22,13 @@ DoneWall is a cozy, offline-first to-do app. Plan your day on sticky notes; when
 - **Big goals**: a Goals board on the wall holds index cards for long-term goals. Link daily tasks to a goal in the editor; a brass progress rail fills against a target count (or all linked tasks), with an optional due date and an *Achieved* stamp when you get there.
 - **Mood of the day**: pick one of five faces under today's progress. It shows as a sticker on the wall note and in the calendar, and Statistics compares your mood with how much you got done.
 - **Pins & stamps collection**: achievements unlock new pins (gold, copper, crystal, star, heart) and DONE stamps (star, laurel, heart, moon). Choose them in Statistics → Pins & stamps, or keep a random mix of pins.
-- **Seasons, weather and sky**: the window follows the time of day (dawn, day, dusk, night) and the season: snow and snow-capped roofs in winter, rain in spring, clear summer skies, falling leaves in autumn. Weather and sky can be fixed in Settings → Environment.
-- **Print the wall**: the printer button on My Wall prints the board you are looking at (day, week, month, year or goals) as a landscape poster.
+- **Seasons, weather and sky**: the window follows the time of day (dawn, day, dusk, night) and the season: snow and snow-capped roofs in winter, rain in spring, clear summer skies, falling leaves in autumn. Weather and sky can be fixed in Settings → Environment. The window also appears in the Light and Dark themes, and the optional ambience follows the weather.
+- **Print the wall**: the printer button on My Wall prints the board you are looking at (day, week, month, year, heatmap or goals) as a landscape poster on A4 or A3, with a title and footer.
+- **Smart quick add**: type “call Ahmed tomorrow 9am”, “report friday at 3 !” or, in Arabic, “اتصل بأحمد باچر 9 الصبح”. A live preview shows the date, time and urgency DoneWall understood, and tasks for another day go straight to that day.
+- **Welcome tour**: three short steps for first-time users (write a task, finish the day, pin it), ending in today's note ready to type. It can be replayed from Settings → About.
+- **Year heatmap**: switch the Year view between pinned notes and a heatmap in wood tones, darker for days you finished. Pinned days carry a brass dot.
+- **Settings search**: a search field and section shortcuts at the top of Settings.
+- **Haptics**: a light vibration on supported phones when you check a task, finish the day or pin a note (can be turned off).
 - **Focus Mode** (`F`): calms the room, dims the interface, highlights your current note and pins your notes onto the wood.
 - **Personalization**: three wood themes, default note color, animation level (follows `prefers-reduced-motion`), optional sounds (off by default), English and Arabic (RTL), first weekday, date format, and daily reminders where the browser supports them.
 - **Your data stays local**: stored in IndexedDB on your device. Export and import JSON backups with merge or replace. If storage is unavailable, the app falls back to in-memory storage and tells you.

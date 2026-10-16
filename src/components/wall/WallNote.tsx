@@ -88,7 +88,7 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
           dimmed && 'opacity-30',
         )}
       >
-        <span className={cn('chalk font-hand leading-none', lg ? 'text-6xl' : 'text-[40px]', status !== 'today' && 'opacity-60')}>
+        <span className={cn('chalk font-hand leading-none', lg ? 'text-6xl' : 'text-[40px]', status !== 'today' && 'opacity-85')}>
           {fmt(date, 'day')}
         </span>
         {status === 'today' && (

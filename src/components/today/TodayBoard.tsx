@@ -478,6 +478,7 @@ function EmptyDay({ editable, onStart }: { editable: boolean; onStart: () => voi
         <button
           type="button"
           onClick={onStart}
+          data-start-day
           className="mx-auto mt-6 flex h-12 items-center gap-2 rounded-full bg-[#302c28] px-6 text-[15px] font-medium text-[#fffdf8] shadow-soft transition active:scale-[0.97]"
         >
           <Plus className="size-5" /> {d.today.addTask}
