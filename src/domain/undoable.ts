@@ -13,6 +13,7 @@ import {
   deleteNote,
   deleteTask,
   reorderTasks,
+  setSubtaskDone,
   restoreArchive,
   toggleTask,
   unarchiveDay,
@@ -115,4 +116,11 @@ export async function uPin(date: DateKey) {
     record({ label: 'dayPinned', undo: () => unarchiveDay(date), redo: () => restoreArchive(archive) })
   }
   return res
+}
+
+export async function uSetSubtask(taskId: string, subId: string, done: boolean) {
+  const before = await db.tasks.get(taskId)
+  await setSubtaskDone(taskId, subId, done)
+  const after = await db.tasks.get(taskId)
+  return taskEntry(after?.completed && !before?.completed ? 'taskCompleted' : 'taskEdited', taskId, before, after)
 }

@@ -7,6 +7,16 @@ export type NoteColor = (typeof NOTE_COLORS)[number]
 export const PRIORITIES = ['none', 'low', 'medium', 'high'] as const
 export type Priority = (typeof PRIORITIES)[number]
 
+export interface Subtask {
+  id: string
+  title: string
+  done: boolean
+}
+
+export const MOODS = ['great', 'good', 'okay', 'low', 'tired'] as const
+export type Mood = (typeof MOODS)[number]
+export const MOOD_EMOJI: Record<Mood, string> = { great: '😄', good: '🙂', okay: '😐', low: '😔', tired: '😴' }
+
 export interface Task {
   id: string
   date: DateKey
@@ -24,6 +34,10 @@ export interface Task {
   /** When unfinished work was carried forward, the date it moved to. */
   rescheduledTo: DateKey | null
   rescheduledFrom: DateKey | null
+  /** Small checklist inside a task. */
+  subtasks?: Subtask[]
+  /** Big goal this task contributes to. */
+  goalId?: string | null
   createdAt: number
   updatedAt: number
 }
@@ -42,6 +56,7 @@ export interface DayMeta {
   date: DateKey
   title: string
   personalNote: string
+  mood?: Mood | null
   updatedAt: number
 }
 
@@ -56,6 +71,8 @@ export interface ArchivedTask {
   completed: boolean
   completedAt: number | null
   noteId: string
+  subtasks?: Subtask[]
+  goalId?: string | null
 }
 
 /** A frozen snapshot of a day, pinned to the wall. One per date. */
@@ -74,7 +91,29 @@ export interface Archive {
   updatedAt: number
   /** User nudge of the note inside its wall slot, in board pixels (snapped). */
   offset?: { x: number; y: number }
+  mood?: Mood | null
 }
+
+/** A bigger goal that daily tasks feed into. */
+export interface Goal {
+  id: string
+  title: string
+  description: string
+  color: NoteColor
+  /** Number of linked tasks to finish; null = all linked tasks. */
+  target: number | null
+  dueDate: DateKey | null
+  achievedAt: number | null
+  createdAt: number
+  updatedAt: number
+}
+
+export const PIN_STYLES = ['red', 'brass', 'walnut', 'sage', 'gold', 'copper', 'crystal', 'star', 'heart'] as const
+export type PinStyle = (typeof PIN_STYLES)[number]
+export const STAMP_STYLES = ['classic', 'star', 'laurel', 'heart', 'moon'] as const
+export type StampStyle = (typeof STAMP_STYLES)[number]
+export type WeatherPref = 'auto' | 'rain' | 'snow' | 'leaves' | 'clear'
+export type SkyPref = 'live' | 'night'
 
 export interface Category {
   id: string
@@ -168,6 +207,12 @@ export interface Prefs {
   /** Active custom wallpapers (ids in the wallpapers table); null = the original DoneWall scene. */
   wallpaperWorkspace: string | null
   wallpaperWindow: string | null
+  /** Collection */
+  pinStyle: 'mixed' | PinStyle
+  stampStyle: StampStyle
+  /** Window weather and sky */
+  weather: WeatherPref
+  sky: SkyPref
   updatedAt: number
 }
 
@@ -228,6 +273,10 @@ export const DEFAULT_PREFS: Prefs = {
   parallax: true,
   wallpaperWorkspace: null,
   wallpaperWindow: null,
+  pinStyle: 'mixed',
+  stampStyle: 'classic',
+  weather: 'auto',
+  sky: 'live',
   updatedAt: 0,
 }
 

@@ -2,9 +2,11 @@ import { CalendarCheck2, CheckCheck, Flame, StickyNote, Trophy, TrendingUp } fro
 import { motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { AchievementStamp } from '@/components/achievements/AchievementStamp'
+import { CollectionPanel } from '@/components/achievements/CollectionPanel'
 import { ACHIEVEMENTS } from '@/domain/achievements'
-import { monthlyTrend, overallStats, weekdayTotals } from '@/domain/stats'
-import { useAchievementRecords, useSummaries } from '@/hooks/useData'
+import { monthlyTrend, moodStats, overallStats, weekdayTotals } from '@/domain/stats'
+import { MOOD_EMOJI } from '@/domain/types'
+import { useAchievementRecords, useMoods, useSummaries } from '@/hooks/useData'
 import { dur, useMotionLevel, type MotionLevel } from '@/hooks/useMotionLevel'
 import { useToday } from '@/hooks/useToday'
 import { weekdayOrder } from '@/lib/dates'
@@ -18,6 +20,7 @@ export function StatisticsDashboard() {
   const level = useMotionLevel()
   const weekStartsOn = usePrefs((s) => s.prefs.weekStartsOn)
   const summaries = useSummaries()
+  const moods = useMoods()
   const records = useAchievementRecords()
   const unlocked = new Map(records.map((r) => [r.id, r.unlockedAt]))
   const data = useMemo(() => {
@@ -26,11 +29,12 @@ export function StatisticsDashboard() {
       stats: overallStats(summaries, today, weekStartsOn),
       trend: monthlyTrend(summaries, today, 12),
       weekdays: weekdayTotals(summaries),
+      moods: moodStats(summaries, moods),
     }
-  }, [summaries, today, weekStartsOn])
+  }, [summaries, moods, today, weekStartsOn])
 
   if (!data) return <div className="h-dvh" />
-  const { stats, trend, weekdays } = data
+  const { stats, trend, weekdays, moods: moodRows } = data
   const days = (n: number) => f(n === 1 ? d.stats.day : d.stats.days, { n })
   const wdName = (wd: number, style: 'weekday' | 'weekdayShort') => formatKey(new Date(2023, 0, 1 + wd), style, lang, 'friendly')
 
@@ -84,6 +88,24 @@ export function StatisticsDashboard() {
         </Card>
       </section>
 
+      <Card title={d.mood.stats} desc={d.mood.statsDesc} className="mt-3">
+        {moodRows.length === 0 ? (
+          <p className="py-6 text-center text-sm text-ink-soft">{d.mood.none}</p>
+        ) : (
+          <BarChart
+            level={level}
+            bars={moodRows.map((m) => ({
+              key: m.mood,
+              label: `${MOOD_EMOJI[m.mood]} ${d.mood.labels[m.mood]}`,
+              value: m.average,
+              tooltip: `${d.mood.labels[m.mood]}: ${m.average}% · ${f(d.mood.days, { n: m.days })}`,
+            }))}
+            caption={d.mood.stats}
+            headers={[d.mood.question, d.calendar.rate]}
+          />
+        )}
+      </Card>
+
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-semibold">{d.stats.achievements}</h2>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -92,6 +114,7 @@ export function StatisticsDashboard() {
           ))}
         </ul>
       </section>
+      <CollectionPanel />
     </div>
   )
 }

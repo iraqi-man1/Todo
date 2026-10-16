@@ -5,11 +5,11 @@ import { DraggableNote, type Offset } from './drag'
 import { PaperPhysics } from '@/components/paper/PaperPhysics'
 import { useEffects } from '@/hooks/useMotionLevel'
 import { DoneStamp } from '@/components/paper/DoneStamp'
-import { Pushpin, type PinColor } from '@/components/paper/Pushpin'
+import { Pushpin } from '@/components/paper/Pushpin'
 import { Paper } from '@/components/paper/StickyNote'
-import { noteRotation, seededPick } from '@/domain/colors'
+import { noteRotation } from '@/domain/colors'
 import type { DaySummary } from '@/domain/summary'
-import type { Archive, DateKey, NoteColor } from '@/domain/types'
+import { MOOD_EMOJI, type Archive, type DateKey, type Mood, type NoteColor, type PinStyle, type StampStyle } from '@/domain/types'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { useI18n } from '@/lib/i18n'
 import { playSound } from '@/lib/sound'
@@ -26,7 +26,6 @@ export function slotStatus(date: DateKey, summary: DaySummary | undefined, today
   return 'empty'
 }
 
-const PINS: PinColor[] = ['red', 'brass', 'walnut', 'sage', 'red']
 
 export interface WallNoteProps {
   date: DateKey
@@ -42,12 +41,15 @@ export interface WallNoteProps {
   offset?: Offset
   /** Staggered entrance when a new period slides in. */
   enter?: { index: number; delay: number }
+  mood?: Mood | null
+  pin?: PinStyle
+  stamp?: StampStyle
   onOpen: (date: DateKey, el: HTMLElement, rotate: number) => void
   onArrived?: () => void
 }
 
 /** One day's slot on the wall. Every state has text, not just color, so status never relies on color alone. */
-export const WallNote = memo(function WallNote({ date, status, summary, archive, fallbackColor, size, level, dimmed, hidden, arrive, offset, enter, onOpen, onArrived }: WallNoteProps) {
+export const WallNote = memo(function WallNote({ date, status, summary, archive, fallbackColor, size, level, dimmed, hidden, arrive, offset, enter, mood, pin, stamp, onOpen, onArrived }: WallNoteProps) {
   const fx = useEffects()
   const { d, f, date: fmt } = useI18n()
   const rot = noteRotation(date)
@@ -118,6 +120,7 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
           </span>
           <span className="mt-0.5 text-[12px] tabular-nums text-[#302c28]/60">{f(d.wall.tasksDone, { done, total })}</span>
         </Paper>
+        {mood && <MoodSticker mood={mood} size={lg ? 'lg' : 'md'} />}
         <span aria-hidden className="absolute -top-2 left-1/2 h-5 w-14 -translate-x-1/2 rotate-[-4deg] bg-[rgb(255_253_240/0.55)] shadow-[0_1px_2px_rgb(0_0_0/0.15)] backdrop-blur-[1px]" />
       </button>
     )
@@ -126,7 +129,6 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
   // pinned or ready
   const color = archive?.color ?? fallbackColor
   const pinned = status === 'pinned'
-  const pin = seededPick(date, PINS)
   const full = level === 'full'
   const physics = fx.physics && !arrive
   // Arrival: glide in, wait for the pin, then swing to rest around it.
@@ -183,6 +185,7 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
             {!pinned && <span className="mt-0.5 block text-[11px] font-semibold tracking-wide text-[#302c28]/60 uppercase">{d.celebrate.readyToPin}</span>}
           </span>
         </Paper>
+        {mood && <MoodSticker mood={mood} size={lg ? 'lg' : 'md'} />}
         {pinned && (
           <motion.span
             className={cn('absolute end-1', lg ? 'top-6' : 'top-4')}
@@ -190,7 +193,7 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
             transition={arrive ? { delay: full ? 2.0 : 0.3, type: 'spring', stiffness: 380, damping: 14 } : { duration: 0 }}
           >
-            <DoneStamp size={lg ? 64 : 44} label={d.stamp} rotate={-14 + rot * 2} />
+            <DoneStamp size={lg ? 64 : 44} label={d.stamp} rotate={-14 + rot * 2} variant={stamp} />
           </motion.span>
         )}
       </PaperPhysics>
@@ -207,7 +210,7 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
               : { duration: 0 }
           }
         >
-          <Pushpin color={pin} size={lg ? 22 : 18} className="relative" />
+          <Pushpin color={pin ?? 'red'} size={lg ? 22 : 18} className="relative" />
         </motion.span>
       ) : (
         <span aria-hidden className="absolute -top-2 left-1/2 h-5 w-14 -translate-x-1/2 rotate-[3deg] bg-[rgb(255_253_240/0.55)] shadow-[0_1px_2px_rgb(0_0_0/0.15)]" />
@@ -216,3 +219,18 @@ export const WallNote = memo(function WallNote({ date, status, summary, archive,
     </DraggableNote>
   )
 })
+
+/** A small round sticker with the day's mood, stuck near the bottom corner of the paper. */
+function MoodSticker({ mood, size }: { mood: Mood; size: 'md' | 'lg' }) {
+  const lg = size === 'lg'
+  if (!MOOD_EMOJI[mood]) return null
+  return (
+    <span
+      aria-hidden
+      className={cn('absolute grid place-items-center rounded-full bg-[#FFFDF5] shadow-[0_1px_2px_rgb(0_0_0/0.25),0_0_0_1px_rgb(0_0_0/0.05)]', lg ? '-end-2.5 -bottom-2.5 size-9 text-[20px]' : '-end-2 -bottom-2 size-7 text-[15px]')}
+      style={{ transform: 'rotate(10deg)' }}
+    >
+      {MOOD_EMOJI[mood]}
+    </span>
+  )
+}

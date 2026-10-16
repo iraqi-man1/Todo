@@ -469,3 +469,39 @@ body {
 :root.app-hidden *::after {
   animation-play-state: paused !important;
 }
+
+/* Print the wall: only the poster sheet goes to paper. Off-screen (not display:none) on screen so it can be measured. */
+.dw-print-sheet {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  pointer-events: none;
+}
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body > *:not(.dw-print-sheet) {
+    display: none !important;
+  }
+  .dw-print-sheet {
+    position: static;
+    left: auto;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .dw-print-sheet * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .dw-no-print {
+    display: none !important;
+  }
+}

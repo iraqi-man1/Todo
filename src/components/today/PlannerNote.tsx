@@ -14,6 +14,7 @@ import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
 import { DoneStamp } from '@/components/paper/DoneStamp'
 import { PaperPhysics } from '@/components/paper/PaperPhysics'
 import { useEffects } from '@/hooks/useMotionLevel'
+import { useCollection } from '@/hooks/useCollection'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Paper } from '@/components/paper/StickyNote'
 import { ConfirmDialog } from '@/components/ui/dialog'
@@ -25,10 +26,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { uAddTask, uReorder, uUpdateNote, uUpdateTask } from '@/domain/undoable'
+import { uAddTask, uReorder, uSetSubtask, uUpdateNote, uUpdateTask } from '@/domain/undoable'
 import { playSound } from '@/lib/sound'
 import { NOTE_HEX } from '@/domain/colors'
-import { NOTE_COLORS, type Category, type DayNote, type Task } from '@/domain/types'
+import { NOTE_COLORS, type Category, type DayNote, type Goal, type Task } from '@/domain/types'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -45,6 +46,7 @@ interface Props {
   note: DayNote
   tasks: Task[]
   categories: Map<string, Category>
+  goals: Map<string, Goal>
   editable: boolean
   level: MotionLevel
   canDelete: boolean
@@ -55,11 +57,12 @@ interface Props {
 }
 
 export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function PlannerNote(
-  { note, tasks, categories, editable, level, canDelete, onToggle, onDelete, onDeleteNote, onError },
+  { note, tasks, categories, goals, editable, level, canDelete, onToggle, onDelete, onDeleteNote, onError },
   ref,
 ) {
   const { d, f } = useI18n()
   const fx = useEffects()
+  const collection = useCollection()
   const openEditor = useUI((s) => s.openEditor)
   const hideCompleted = useUI((s) => s.hideCompleted)
   const setHideCompleted = useUI((s) => s.setHideCompleted)
@@ -213,7 +216,7 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
               transition={{ type: 'spring', stiffness: 420, damping: 16, delay: level === 'full' ? 0.55 : 0 }}
             >
-              <DoneStamp size={74} label={d.stampCompleted} rotate={-10} />
+              <DoneStamp size={74} label={d.stampCompleted} rotate={-10} variant={collection.stamp} />
             </motion.span>
           )}
         </AnimatePresence>
@@ -231,6 +234,8 @@ export const PlannerNote = forwardRef<PlannerNoteHandle, Props>(function Planner
                   onToggle={onToggle}
                   onEdit={(task) => openEditor({ date: task.date, taskId: task.id })}
                   onRename={(task, title) => uUpdateTask(task.id, { title }).catch(onError)}
+                  onSubtask={(task, subId, done) => uSetSubtask(task.id, subId, done).catch(onError)}
+                  goal={t.goalId ? goals.get(t.goalId) : undefined}
                   onDelete={onDelete}
                 />
               ))}

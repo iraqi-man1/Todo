@@ -1,5 +1,5 @@
 import { addMonths, addWeeks, addYears } from 'date-fns'
-import { CalendarCheck, ChevronLeft, ChevronRight, Filter, Maximize2, Minus, Plus, Search } from 'lucide-react'
+import { CalendarCheck, ChevronLeft, ChevronRight, Filter, Maximize2, Minus, Plus, Printer, Search } from 'lucide-react'
 import { AnimatePresence, motion, useTransform, type MotionValue } from 'motion/react'
 import { Tip } from '@/components/ui/tooltip'
 import { setArchiveOffset } from '@/domain/actions'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Segmented } from '@/components/ui/fields'
 import type { Archive, DateKey } from '@/domain/types'
-import { useArchives, useSummaries } from '@/hooks/useData'
+import { useArchives, useMoods, useSummaries } from '@/hooks/useData'
 import { dur, useMotionLevel } from '@/hooks/useMotionLevel'
 import { useToday } from '@/hooks/useToday'
 import { addDaysKey, fromKey, isoWeek, toKey, weekDays } from '@/lib/dates'
@@ -19,8 +19,11 @@ import { useI18n } from '@/lib/i18n'
 import { cn, isTypingTarget } from '@/lib/utils'
 import { usePrefs } from '@/store/prefs'
 import { useUI, type WallFilter, type WallView } from '@/store/ui'
+import { PrintWall } from './PrintWall'
 import { DayBoard, MonthBoard, WeekBoard, YearBoard, type BoardProps } from './Boards'
 import { WallSearch } from './WallSearch'
+import { GoalsBoard } from '@/components/goals/GoalsBoard'
+import { useCollection } from '@/hooks/useCollection'
 import { WallViewport, type WallViewportHandle } from './WallViewport'
 
 function useNarrow() {
@@ -53,12 +56,16 @@ export function WoodenWall() {
   const anchor = anchorState ?? today
   const archivesList = useArchives()
   const summaries = useSummaries()
+  const moods = useMoods()
+  const collection = useCollection()
   const archives = useMemo(() => new Map<DateKey, Archive>((archivesList ?? []).map((a) => [a.date, a])), [archivesList])
   const vp = useRef<WallViewportHandle>(null)
   const dateInput = useRef<HTMLInputElement>(null)
   const ready = !!archivesList && !!summaries
 
   const [dirn, setDirn] = useState(0)
+  const [printing, setPrinting] = useState(false)
+  const endPrint = useCallback(() => setPrinting(false), [])
   const wallFocus = useUI((s) => s.wallFocus)
   const shift = (n: number) => {
     setDirn(n)
@@ -69,7 +76,9 @@ export function WoodenWall() {
   }
 
   const periodLabel =
-    view === 'day'
+    view === 'goals'
+      ? d.wall.views.goals
+      : view === 'day'
       ? date(anchor, 'medium')
       : view === 'week'
         ? `${f(d.wall.week, { n: isoWeek(anchor) })} · ${date(weekDays(anchor, prefs.weekStartsOn)[0], 'short')}`
@@ -78,7 +87,7 @@ export function WoodenWall() {
           : date(anchor, 'year')
 
   const periodKey =
-    view === 'day' ? anchor : view === 'week' ? weekDays(anchor, prefs.weekStartsOn)[0] : view === 'month' ? anchor.slice(0, 7) : anchor.slice(0, 4)
+    view === 'goals' ? 'all' : view === 'day' ? anchor : view === 'week' ? weekDays(anchor, prefs.weekStartsOn)[0] : view === 'month' ? anchor.slice(0, 7) : anchor.slice(0, 4)
   const fitKey = `${view}|${periodKey}|${narrow}`
 
   // Zoom toward a freshly pinned note once the board is laid out.
@@ -173,10 +182,12 @@ export function WoodenWall() {
         },
         onMoveNote,
         dirn,
+        moods,
+        collection,
       }
     : null
 
-  const views: WallView[] = ['day', 'week', 'month', 'year']
+  const views: WallView[] = ['day', 'week', 'month', 'year', 'goals']
   const filters: WallFilter[] = ['all', 'complete', 'incomplete']
 
   return (
@@ -195,7 +206,7 @@ export function WoodenWall() {
           options={views.map((v) => ({ value: v, label: d.wall.views[v] }))}
           className="order-3 w-full sm:order-none sm:w-auto [&>button]:flex-1"
         />
-        <div className="flex min-w-0 flex-1 items-center gap-0.5 sm:flex-none">
+        <div className={cn('flex min-w-0 flex-1 items-center gap-0.5 sm:flex-none', view === 'goals' && 'invisible')} aria-hidden={view === 'goals' || undefined}>
           <Tip label={d.wall.prev}>
             <Button variant="ghost" size="iconSm" onClick={() => shift(-1)} aria-label={d.wall.prev}>
               <ChevronLeft className="rtl:rotate-180" />
@@ -232,7 +243,7 @@ export function WoodenWall() {
           </Tip>
         </div>
         <div className="ms-auto flex items-center gap-1">
-          {anchor !== today && (
+          {anchor !== today && view !== 'goals' && (
             <Button
               variant="subtle"
               size="sm"
@@ -261,6 +272,11 @@ export function WoodenWall() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Tip label={d.print.hint}>
+            <Button variant="ghost" size="iconSm" onClick={() => setPrinting(true)} disabled={!boardProps || printing} aria-label={d.print.button}>
+              <Printer />
+            </Button>
+          </Tip>
           <Tip label={d.wall.search} shortcut="/">
             <Button variant="ghost" size="iconSm" onClick={() => setSearchOpen(true)} aria-label={d.wall.search}>
               <Search />
@@ -305,6 +321,7 @@ export function WoodenWall() {
                   {view === 'week' && <WeekBoard {...boardProps} />}
                   {view === 'year' && <YearBoard {...boardProps} />}
                   {view === 'day' && <DayBoard {...boardProps} />}
+                  {view === 'goals' && <GoalsBoard narrow={narrow} level={level} />}
                 </motion.div>
               </AnimatePresence>
             </WallViewport>
@@ -313,6 +330,8 @@ export function WoodenWall() {
 
         <p className="pointer-events-none absolute start-3 bottom-3 hidden rounded-full bg-surface/80 px-3 py-1.5 text-xs text-ink-soft backdrop-blur sm:block">{d.wall.hint}</p>
       </div>
+
+      {printing && boardProps && <PrintWall view={view} props={boardProps} onDone={endPrint} />}
 
       <WallSearch
         open={searchOpen}

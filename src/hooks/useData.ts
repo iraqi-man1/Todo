@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo } from 'react'
 import { db } from '@/db/db'
 import { buildDaySummaries, type DaySummary } from '@/domain/summary'
-import type { Archive, DateKey } from '@/domain/types'
+import { MOODS, type Archive, type DateKey, type Mood } from '@/domain/types'
 
 export function useDay(date: DateKey) {
   const data = useLiveQuery(async () => {
@@ -41,4 +41,14 @@ export function useRecurrences() {
 
 export function useAchievementRecords() {
   return useLiveQuery(() => db.achievements.toArray(), []) ?? []
+}
+
+export function useGoals() {
+  return useLiveQuery(() => db.goals.orderBy('createdAt').toArray(), []) ?? []
+}
+
+/** Mood per day (only days that have one). */
+export function useMoods(): Map<DateKey, Mood> {
+  const rows = useLiveQuery(() => db.days.filter((d) => !!d.mood && (MOODS as readonly string[]).includes(d.mood)).toArray(), [])
+  return useMemo(() => new Map((rows ?? []).map((r) => [r.date, r.mood as Mood])), [rows])
 }

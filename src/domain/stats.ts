@@ -1,6 +1,6 @@
 import { addDaysKey, compareKeys, fromKey, monthDays, monthKey, weekDays, type WeekStart } from '@/lib/dates'
 import { percent, type DaySummary } from './summary'
-import type { DateKey } from './types'
+import { MOODS, type DateKey, type Mood } from './types'
 
 /**
  * Streak of consecutive fully-completed days ending today, or ending yesterday if today is still in
@@ -127,4 +127,28 @@ export function overallStats(
     archivedNotes,
     bestMonthCompletedDays: Math.max(0, ...perMonth.values()),
   }
+}
+
+export interface MoodStat {
+  mood: Mood
+  days: number
+  /** Average completion % on days with this mood (days with tasks only). */
+  average: number
+}
+
+/** How completion relates to mood. Only days that have both a mood and at least one task count. */
+export function moodStats(summaries: Map<DateKey, DaySummary>, moods: Map<DateKey, Mood>): MoodStat[] {
+  const acc = new Map<Mood, { sum: number; n: number }>()
+  for (const [date, mood] of moods) {
+    const s = summaries.get(date)
+    if (!s || s.total === 0) continue
+    const a = acc.get(mood) ?? { sum: 0, n: 0 }
+    a.sum += s.percentage
+    a.n++
+    acc.set(mood, a)
+  }
+  return MOODS.filter((m) => acc.has(m)).map((m) => {
+    const a = acc.get(m)!
+    return { mood: m, days: a.n, average: Math.round(a.sum / a.n) }
+  })
 }

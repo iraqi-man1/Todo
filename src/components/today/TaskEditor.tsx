@@ -7,8 +7,10 @@ import { Input, Label, Segmented, Select, Textarea } from '@/components/ui/field
 import { db } from '@/db/db'
 import { createRecurrence, deleteRecurrence } from '@/domain/actions'
 import { uAddTask, uUpdateTask } from '@/domain/undoable'
-import { PRIORITIES, type Priority, type RecurrenceFrequency, type Task } from '@/domain/types'
-import { useCategories } from '@/hooks/useData'
+import { PRIORITIES, type Priority, type RecurrenceFrequency, type Subtask, type Task } from '@/domain/types'
+import { uid } from '@/domain/ids'
+import { X } from 'lucide-react'
+import { useCategories, useGoals } from '@/hooks/useData'
 import { fromKey, weekdayOrder } from '@/lib/dates'
 import { formatKey, useI18n } from '@/lib/i18n'
 import { usePrefs } from '@/store/prefs'
@@ -32,7 +34,7 @@ export function TaskEditor() {
 function EditorBody() {
   const editor = useUI((s) => s.editor)!
   const close = useUI((s) => s.closeEditor)
-  const { d, lang } = useI18n()
+  const { d, f, lang } = useI18n()
   const prefs = usePrefs((s) => s.prefs)
   const categories = useCategories()
   const data = useLiveQuery(async () => {
@@ -49,6 +51,10 @@ function EditorBody() {
   const [priority, setPriority] = useState<Priority>('none')
   const [dueTime, setDueTime] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [goalId, setGoalId] = useState('')
+  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [stepDraft, setStepDraft] = useState('')
+  const goals = useGoals()
   const [noteId, setNoteId] = useState(editor.noteId ?? '')
   const [repeat, setRepeat] = useState<Repeat>('none')
   const [weekdays, setWeekdays] = useState<number[]>([fromKey(editor.date).getDay()])
@@ -65,6 +71,8 @@ function EditorBody() {
       setPriority(t.priority)
       setDueTime(t.dueTime ?? '')
       setCategoryId(t.categoryId ?? '')
+      setGoalId(t.goalId ?? '')
+      setSubtasks(t.subtasks ?? [])
       setNoteId(t.noteId)
       if (data.recurrence) {
         setRepeat(data.recurrence.frequency)
@@ -103,6 +111,8 @@ function EditorBody() {
         priority,
         dueTime: dueTime || null,
         categoryId: categoryId || null,
+        goalId: goalId || null,
+        subtasks: [...subtasks, ...(stepDraft.trim() ? [{ id: uid(), title: stepDraft.trim(), done: false }] : [])].filter((s) => s.title.trim()),
       }
       let task: Task | undefined
       if (isEdit) {
@@ -227,6 +237,67 @@ function EditorBody() {
             </Select>
           </div>
         </div>
+        <div>
+          <Label htmlFor="task-step">{d.subtasks.title}</Label>
+          {subtasks.length > 0 && (
+            <ul className="mb-2 flex flex-col gap-1">
+              {subtasks.map((s, i) => (
+                <li key={s.id} className="flex items-center gap-2 rounded-lg bg-surface-2/60 px-2">
+                  <input
+                    type="checkbox"
+                    checked={s.done}
+                    onChange={(e) => setSubtasks((list) => list.map((x) => (x.id === s.id ? { ...x, done: e.target.checked } : x)))}
+                    aria-label={f(d.subtasks.mark, { title: s.title || String(i + 1) })}
+                    className="size-4 accent-[var(--dw-accent)]"
+                  />
+                  <input
+                    value={s.title}
+                    maxLength={140}
+                    onChange={(e) => setSubtasks((list) => list.map((x) => (x.id === s.id ? { ...x, title: e.target.value } : x)))}
+                    aria-label={d.subtasks.title}
+                    className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSubtasks((list) => list.filter((x) => x.id !== s.id))}
+                    aria-label={f(d.subtasks.remove, { title: s.title })}
+                    className="grid size-8 place-items-center rounded-full text-ink-soft hover:bg-surface-2 hover:text-ink"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Input
+            id="task-step"
+            value={stepDraft}
+            maxLength={140}
+            placeholder={d.subtasks.add}
+            onChange={(e) => setStepDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (!stepDraft.trim()) return
+                setSubtasks((list) => [...list, { id: uid(), title: stepDraft.trim(), done: false }])
+                setStepDraft('')
+              }
+            }}
+          />
+        </div>
+        {goals.length > 0 && (
+          <div>
+            <Label htmlFor="task-goal">{d.goals.link}</Label>
+            <Select id="task-goal" value={goalId} onChange={(e) => setGoalId(e.target.value)}>
+              <option value="">{d.goals.none}</option>
+              {goals.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.title}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         {data && data.notes.length > 1 && (
           <div>
             <Label htmlFor="task-note">{d.task.note}</Label>

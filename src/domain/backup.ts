@@ -10,6 +10,7 @@ import type {
   Recurrence,
   RecurrenceRun,
   Task,
+  Goal,
 } from './types'
 
 export const BACKUP_FORMAT = 'donewall-backup'
@@ -29,11 +30,12 @@ export interface Backup {
     recurrenceRuns: RecurrenceRun[]
     achievements: AchievementRecord[]
     prefs: Prefs[]
+    goals?: Goal[]
   }
 }
 
 export async function exportData(): Promise<Backup> {
-  const [tasks, notes, days, archives, categories, recurrences, recurrenceRuns, achievements, prefs] = await Promise.all([
+  const [tasks, notes, days, archives, categories, recurrences, recurrenceRuns, achievements, prefs, goals] = await Promise.all([
     db.tasks.toArray(),
     db.notes.toArray(),
     db.days.toArray(),
@@ -43,12 +45,13 @@ export async function exportData(): Promise<Backup> {
     db.recurrenceRuns.toArray(),
     db.achievements.toArray(),
     db.prefs.toArray(),
+    db.goals.toArray(),
   ])
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    data: { tasks, notes, days, archives, categories, recurrences, recurrenceRuns, achievements, prefs },
+    data: { tasks, notes, days, archives, categories, recurrences, recurrenceRuns, achievements, prefs, goals },
   }
 }
 
@@ -96,6 +99,7 @@ export function parseBackup(raw: unknown): Backup {
       recurrenceRuns: arr('recurrenceRuns').filter((r) => isStr(r.key)) as unknown as RecurrenceRun[],
       achievements: arr('achievements').filter((a) => isStr(a.id)) as unknown as AchievementRecord[],
       prefs: arr('prefs').filter((p) => p.id === 'prefs') as unknown as Prefs[],
+      goals: arr('goals').filter((g) => isStr(g.id) && isStr(g.title)) as unknown as Goal[],
     },
   }
 }
@@ -126,6 +130,7 @@ export async function importData(backup: Backup, mode: 'merge' | 'replace'): Pro
     db.recurrenceRuns,
     db.achievements,
     db.prefs,
+    db.goals,
   ]
   await db.transaction('rw', tables, async () => {
     if (mode === 'replace') await Promise.all(tables.map((t) => t.clear()))
@@ -150,6 +155,7 @@ export async function importData(backup: Backup, mode: 'merge' | 'replace'): Pro
     await mergeTable(db.categories, d.categories, (r) => r.id)
     await mergeTable(db.recurrences, d.recurrences, (r) => r.id)
     await mergeTable(db.prefs, d.prefs, (r) => r.id)
+    await mergeTable(db.goals, d.goals ?? [], (r) => r.id)
 
     for (const a of d.archives) {
       const sameDate = await db.archives.where('date').equals(a.date).first()

@@ -5,11 +5,15 @@ import { WallpaperImage } from '@/components/wallpaper/WallpaperImage'
 import type { Wallpaper } from '@/domain/types'
 import { useEffects, useMotionLevel } from '@/hooks/useMotionLevel'
 import { useParallax } from '@/hooks/useParallax'
+import { useSky } from '@/hooks/useSky'
 import { useActiveWallpapers } from '@/hooks/useWallpapers'
 import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { usePrefs } from '@/store/prefs'
 import { NightWindow } from './NightWindow'
+
+/** Light the window throws into the room at each time of day. */
+const SPILL = { night: 'rgb(120 150 200 / 0.12)', dawn: 'rgb(240 170 140 / 0.14)', day: 'rgb(220 230 245 / 0.16)', dusk: 'rgb(240 150 90 / 0.15)' } as const
 
 export const WINDOW_W = 'clamp(260px, 26vw, 440px)'
 
@@ -85,6 +89,7 @@ export function Environment() {
   const { night, windowShown, animate, parallax } = useEnvironment()
   const lg = useMedia('(min-width: 1024px)')
   const walls = useActiveWallpapers()
+  const sky = useSky()
   if (!night) {
     // Other themes keep their flat background unless the user picked a workspace wallpaper.
     return walls.workspace ? (
@@ -113,7 +118,7 @@ export function Environment() {
       {windowShown && (
         <div
           className="absolute inset-0 hidden lg:block"
-          style={{ background: `radial-gradient(ellipse 45% 70% at calc(100% - ${WINDOW_W} / 2 - 3vw) 50%, rgb(120 150 200 / 0.12), transparent 70%)` }}
+          style={{ background: `radial-gradient(ellipse 45% 70% at calc(100% - ${WINDOW_W} / 2 - 3vw) 50%, ${SPILL[sky.phase]}, transparent 70%)` }}
         />
       )}
       {/* warm lamp pool */}
@@ -132,7 +137,7 @@ export function Environment() {
         <>
           {/* desktop: a tall window beside the content */}
           <div className="absolute top-[7vh] h-[80vh]" style={{ insetInlineEnd: '3vw', width: WINDOW_W }}>
-            <NightWindow rain={prefs.rain} intensity={prefs.rainIntensity} animate={animate} parallax={parallax} scenery={walls.window} className="h-full w-full" />
+            <NightWindow rain={prefs.rain} weather={sky.weather} phase={sky.phase} season={sky.season} intensity={prefs.rainIntensity} animate={animate} parallax={parallax} scenery={walls.window} className="h-full w-full" />
             <DeskLamp />
             {/* sill */}
             <div
@@ -150,7 +155,7 @@ export function Environment() {
       {/* mobile/tablet: the window as an atmospheric band behind the top of the page */}
       {windowShown && !lg && (
           <div className="absolute inset-x-0 top-0 h-[42vh]" style={{ maskImage: 'linear-gradient(180deg, #000 35%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 35%, transparent)' }}>
-            <NightWindow rain={prefs.rain} intensity={prefs.rainIntensity * 0.7} animate={animate} scenery={walls.window} framed={false} className="h-full w-full opacity-70" />
+            <NightWindow rain={prefs.rain} weather={sky.weather} phase={sky.phase} season={sky.season} intensity={prefs.rainIntensity * 0.7} animate={animate} scenery={walls.window} framed={false} className="h-full w-full opacity-70" />
           </div>
       )}
     </div>

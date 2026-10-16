@@ -9,6 +9,7 @@ import { useAchievementWatcher } from '@/hooks/useAchievementWatcher'
 import { useMotionLevel } from '@/hooks/useMotionLevel'
 import { useReminders } from '@/hooks/useReminders'
 import { useAmbientSound } from '@/hooks/useAmbientSound'
+import { useGoalWatcher } from '@/hooks/useGoalData'
 import { WOOD_PALETTES, paperNoise, woodTexture } from '@/lib/textures'
 import { usePrefs } from '@/store/prefs'
 
@@ -88,6 +89,7 @@ export default function App() {
   useAchievementWatcher()
   useReminders()
   useAmbientSound()
+  useGoalWatcher()
 
   if (!ready) return null
   return (

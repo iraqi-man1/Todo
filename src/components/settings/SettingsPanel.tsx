@@ -26,6 +26,8 @@ import { WallpaperSettings } from './WallpaperSettings'
 import { useReduce } from '@/hooks/useMotionLevel'
 
 const VERSION = '1.0.0'
+const SKY_PREFS = ['live', 'night'] as const
+const WEATHER_PREFS = ['auto', 'rain', 'snow', 'leaves', 'clear'] as const
 
 export function SettingsPanel() {
   const { d } = useI18n()
@@ -134,11 +136,29 @@ export function SettingsPanel() {
         <Row label={d.settings.showWindow}>
           <Switch checked={prefs.showWindow} onCheckedChange={(showWindow) => update({ showWindow })} aria-label={d.settings.showWindow} />
         </Row>
-        <Row label={d.settings.rain}>
-          <Switch checked={prefs.rain} onCheckedChange={(rain) => update({ rain })} aria-label={d.settings.rain} />
+        <Row label={d.weather.sky}>
+          <Select id="pref-sky" aria-label={d.weather.sky} value={prefs.sky} onChange={(e) => update({ sky: e.target.value as Prefs['sky'] })} className="w-52">
+            {SKY_PREFS.map((k) => (
+              <option key={k} value={k}>
+                {d.weather.skyOptions[k]}
+              </option>
+            ))}
+          </Select>
         </Row>
-        <Row label={d.settings.rainIntensity} stacked>
-          <Slider value={[Math.round(prefs.rainIntensity * 100)]} onValueChange={([v]) => update({ rainIntensity: v / 100 })} min={10} max={100} step={5} disabled={!prefs.rain} thumbLabel={d.settings.rainIntensity} />
+        <Row label={d.weather.effects}>
+          <Switch checked={prefs.rain} onCheckedChange={(rain) => update({ rain })} aria-label={d.weather.effects} />
+        </Row>
+        <Row label={d.weather.title}>
+          <Select id="pref-weather" aria-label={d.weather.title} value={prefs.weather} onChange={(e) => update({ weather: e.target.value as Prefs['weather'] })} disabled={!prefs.rain} className="w-52">
+            {WEATHER_PREFS.map((k) => (
+              <option key={k} value={k}>
+                {d.weather.options[k]}
+              </option>
+            ))}
+          </Select>
+        </Row>
+        <Row label={d.weather.intensity} stacked>
+          <Slider value={[Math.round(prefs.rainIntensity * 100)]} onValueChange={([v]) => update({ rainIntensity: v / 100 })} min={10} max={100} step={5} disabled={!prefs.rain} thumbLabel={d.weather.intensity} />
         </Row>
         <Row label={d.settings.ambient} help={d.settings.ambientHelp}>
           <Switch checked={prefs.ambient} onCheckedChange={(ambient) => update({ ambient })} aria-label={d.settings.ambient} />

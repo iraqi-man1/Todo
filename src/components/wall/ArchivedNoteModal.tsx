@@ -16,6 +16,7 @@ import { percent } from '@/domain/summary'
 import type { ArchivedTask, DateKey, NoteColor } from '@/domain/types'
 import { dur, useMotionLevel } from '@/hooks/useMotionLevel'
 import { useToday } from '@/hooks/useToday'
+import { useCollection } from '@/hooks/useCollection'
 import { reportError } from '@/lib/errors'
 import { useI18n } from '@/lib/i18n'
 import { playSound } from '@/lib/sound'
@@ -85,6 +86,7 @@ function useViewModel(date: DateKey | undefined, fallback: NoteColor): ViewModel
         completed: t.completed,
         completedAt: t.completedAt,
         noteId: t.noteId,
+        subtasks: t.subtasks,
         moved: !!t.rescheduledTo,
       })),
       total: tasks.length,
@@ -133,6 +135,7 @@ function ModalBody({ state, onClose }: { state: InspectState; onClose: () => voi
   const navigate = useUI((s) => s.navigate)
   const setJustPinned = useUI((s) => s.setJustPinned)
   const [editing, setEditing] = useState(false)
+  const collection = useCollection()
 
   const W = Math.min(window.innerWidth - 32, 460)
   const o = state.origin
@@ -214,7 +217,7 @@ function ModalBody({ state, onClose }: { state: InspectState; onClose: () => voi
                   </div>
                 )}
 
-                {vm?.archived && <DoneStamp size={78} label={d.stamp} sub={date(state.date, 'short').toUpperCase()} className="absolute end-6 top-16 sm:end-8" />}
+                {vm?.archived && <DoneStamp size={78} label={d.stamp} variant={collection.stamp} sub={date(state.date, 'short').toUpperCase()} className="absolute end-6 top-16 sm:end-8" />}
 
                 {vm && (
                   <div className="mt-6">
@@ -327,6 +330,16 @@ function TaskGroup({
             <div className="min-w-0 flex-1">
               <p className={cn('text-[15px] leading-snug text-[#302c28]', t.completed && 'text-[#302c28]/65 line-through decoration-[#302c28]/35')}>{t.title}</p>
               {t.description && <p className="mt-0.5 text-[13px] text-[#302c28]/60">{t.description}</p>}
+              {t.subtasks && t.subtasks.length > 0 && (
+                <ul className="mt-1 space-y-0.5" aria-label={d.subtasks.title}>
+                  {t.subtasks.map((s) => (
+                    <li key={s.id} className="flex items-center gap-1.5 text-[13px] text-[#302c28]/70">
+                      {s.done ? <Check className="size-3.5 text-[#3D6B39]" strokeWidth={2.6} aria-label={d.detail.completed} /> : <CircleDashed className="size-3.5 text-[#302c28]/40" aria-label={d.detail.incomplete} />}
+                      <span className={cn(s.done && 'line-through decoration-[#302c28]/35')}>{s.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {(t.categoryName || t.dueTime || multi || t.priority !== 'none' || t.moved) && (
                 <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#302c28]/60">
                   {t.categoryName && (

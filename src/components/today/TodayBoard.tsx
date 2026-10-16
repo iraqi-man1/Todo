@@ -22,7 +22,7 @@ import { toastWithUndo } from '@/lib/undoUi'
 import { seededPick } from '@/domain/colors'
 import { summarizeTasks } from '@/domain/summary'
 import type { DateKey, DayNote, Task } from '@/domain/types'
-import { useCategories, useDay } from '@/hooks/useData'
+import { useCategories, useDay, useGoals } from '@/hooks/useData'
 import { dur, useMotionLevel } from '@/hooks/useMotionLevel'
 import { useToday } from '@/hooks/useToday'
 import { addDaysKey, compareKeys } from '@/lib/dates'
@@ -36,6 +36,7 @@ import { CompletionCelebration } from './CompletionCelebration'
 import { useCompletionTransition } from '@/hooks/useCompletionTransition'
 import { useEffects } from '@/hooks/useMotionLevel'
 import { DailyProgress } from './DailyProgress'
+import { MoodPicker } from './MoodPicker'
 import { PlannerNote, type PlannerNoteHandle } from './PlannerNote'
 
 export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
@@ -46,6 +47,8 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
   const day = useDay(date)
   const categories = useCategories()
   const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+  const goalsList = useGoals()
+  const goalMap = useMemo(() => new Map(goalsList.map((g) => [g.id, g])), [goalsList])
   const level = useMotionLevel()
   const { d, f, date: fmt, time } = useI18n()
   const prefs = usePrefs((s) => s.prefs)
@@ -260,6 +263,11 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
         <div className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-3xl border border-line bg-surface px-4 py-3.5 shadow-soft">
           <DailyProgress done={summary?.completed ?? 0} total={summary?.total ?? 0} level={level} />
           {prefs.showMotivation && isToday && <p data-dim className="font-hand text-xl text-ink-soft sm:max-w-[16rem] sm:text-end">{motivation}</p>}
+          {day && (summary?.total ?? 0) > 0 && (
+            <div className="w-full border-t border-line pt-3">
+              <MoodPicker date={date} mood={day.meta?.mood} level={level} />
+            </div>
+          )}
         </div>
       </header>
 
@@ -380,6 +388,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
                       note={n}
                       tasks={day.tasks.filter((t) => t.noteId === n.id)}
                       categories={catMap}
+                      goals={goalMap}
                       editable={editable}
                       level={level}
                       canDelete={editable}

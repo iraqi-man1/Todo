@@ -1,12 +1,13 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Clock, Flag, GripVertical, MoreHorizontal, Pencil, Repeat, Trash2, Undo2 } from 'lucide-react'
+import { ChevronDown, Clock, Flag, GripVertical, ListChecks, MoreHorizontal, Pencil, Repeat, Target, Trash2, Undo2 } from 'lucide-react'
 import { AnimatePresence, motion, useAnimationControls } from 'motion/react'
 import { memo, useRef, useState } from 'react'
 import { HandCheck } from '@/components/paper/HandCheck'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { NOTE_INK } from '@/domain/colors'
-import type { Category, Task } from '@/domain/types'
+import type { Category, Goal, Task } from '@/domain/types'
+import { playSound } from '@/lib/sound'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -24,6 +25,8 @@ export interface TaskItemProps {
   onEdit: (task: Task) => void
   /** Quick inline rename; when absent, clicking the title opens the full editor. */
   onRename?: (task: Task, title: string) => void
+  onSubtask?: (task: Task, subId: string, done: boolean) => void
+  goal?: Goal
   onDelete: (task: Task) => void
 }
 
@@ -51,6 +54,8 @@ function TaskRow({
   onToggle,
   onEdit,
   onRename,
+  onSubtask,
+  goal,
   onDelete,
   dragging,
   handleProps,
@@ -62,6 +67,9 @@ function TaskRow({
   const [moving, setMoving] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const fx = useEffects()
+  const steps = task.subtasks ?? []
+  const stepsDone = steps.filter((s) => s.done).length
+  const [showSteps, setShowSteps] = useState(() => !task.completed)
   const moved = !!task.rescheduledTo
   const canToggle = editable && !moved
 
@@ -156,11 +164,12 @@ function TaskRow({
             }}
           />
         ) : (
+        <div className="min-w-0 flex-1">
         <button
           type="button"
           onClick={() => !swiped.current && editable && (onRename && !moved ? setRenaming(true) : onEdit(task))}
           disabled={!editable}
-          className="min-w-0 flex-1 cursor-text py-1 text-start disabled:cursor-default"
+          className="w-full cursor-text py-1 text-start disabled:cursor-default"
           aria-label={`${task.title}${editable ? `, ${d.task.edit}` : ''}`}
         >
           {/* Strike drawn as a growing background so it sweeps across every wrapped line in order. */}
@@ -188,7 +197,7 @@ function TaskRow({
             {task.title}
           </motion.span>
           {task.description && <span className="mt-0.5 line-clamp-2 block text-[13px] text-[#302c28]/60">{task.description}</span>}
-          <Meta task={task} category={category} moved={moved} />
+          <Meta task={task} category={category} goal={goal} moved={moved} />
           {moved && (
             <span className="mt-1 flex items-center gap-1 text-xs font-medium text-[#302c28]/55">
               <Undo2 className="size-3 -scale-x-100" />
@@ -196,6 +205,59 @@ function TaskRow({
             </span>
           )}
         </button>
+        {steps.length > 0 && (
+          <div className="pb-1">
+            <button
+              type="button"
+              onClick={() => setShowSteps((v) => !v)}
+              aria-expanded={showSteps}
+              className="flex h-7 items-center gap-1.5 rounded-md px-1 text-xs font-medium text-[#302c28]/60 hover:bg-black/5 hover:text-[#302c28]"
+            >
+              <ListChecks className="size-3.5" />
+              {f(d.subtasks.progress, { done: stepsDone, total: steps.length })}
+              <span className="ms-1 h-1 w-10 overflow-hidden rounded-full bg-black/10" aria-hidden>
+                <span className="block h-full rounded-full bg-[#4F7A4A]/70 transition-[width] duration-300" style={{ width: `${(stepsDone / steps.length) * 100}%` }} />
+              </span>
+              <ChevronDown className={cn('size-3.5 transition-transform', showSteps && 'rotate-180')} />
+              <span className="sr-only">{showSteps ? d.subtasks.hide : d.subtasks.show}</span>
+            </button>
+            <AnimatePresence initial={false}>
+              {showSteps && (
+                <motion.ul
+                  initial={level === 'off' ? false : { height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={level === 'off' ? undefined : { height: 0, opacity: 0 }}
+                  transition={{ duration: level === 'full' ? 0.22 : 0.12 }}
+                  className="overflow-hidden"
+                >
+                  {steps.map((s) => (
+                    <li key={s.id} className="flex min-h-8 items-center gap-2 ps-1">
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={s.done}
+                        aria-label={f(d.subtasks.mark, { title: s.title })}
+                        disabled={!editable || moved}
+                        onClick={() => {
+                          if (!s.done && fx.completion) playSound('pencil')
+                          onSubtask?.(task, s.id, !s.done)
+                        }}
+                        className={cn(
+                          'grid size-[18px] shrink-0 place-items-center rounded-[5px] border-[1.5px] transition-colors',
+                          s.done ? 'border-[#4F7A4A] bg-[#4F7A4A]/10 text-[#3D6B39]' : 'border-[#302c28]/35 bg-white/40 hover:border-[#302c28]/60',
+                        )}
+                      >
+                        <HandCheck checked={s.done} level={level} className="size-3.5" />
+                      </button>
+                      <span className={cn('text-[13.5px] leading-snug text-[#302c28]/85', s.done && 'text-[#302c28]/50 line-through decoration-[#302c28]/40')}>{s.title}</span>
+                    </li>
+                  ))}
+                </motion.ul>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+        </div>
         )}
 
         {editable && (
@@ -221,7 +283,7 @@ function TaskRow({
   )
 }
 
-function Meta({ task, category, moved }: { task: Task; category?: Category; moved: boolean }) {
+function Meta({ task, category, goal, moved }: { task: Task; category?: Category; goal?: Goal; moved: boolean }) {
   const { d, f, date } = useI18n()
   const items = []
   if (task.priority !== 'none')
@@ -243,6 +305,13 @@ function Meta({ task, category, moved }: { task: Task; category?: Category; move
       <span key="c" className="flex items-center gap-1">
         <span className="size-2 rounded-full" style={{ background: NOTE_INK[category.color] }} />
         {category.name}
+      </span>,
+    )
+  if (goal)
+    items.push(
+      <span key="g" className="flex items-center gap-1" title={d.goals.link}>
+        <Target className="size-3" style={{ color: NOTE_INK[goal.color] }} />
+        <span className="max-w-[10rem] truncate">{goal.title}</span>
       </span>,
     )
   if (task.recurrenceId)

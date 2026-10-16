@@ -2,7 +2,7 @@ import { Check, CircleDashed } from 'lucide-react'
 import { NOTE_HEX } from '@/domain/colors'
 import { rangeStats } from '@/domain/stats'
 import type { DaySummary } from '@/domain/summary'
-import type { Archive, DateKey, NoteColor } from '@/domain/types'
+import type { Archive, DateKey, Mood, NoteColor } from '@/domain/types'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { fromKey, isoWeek, monthDays, monthGrid, toKey, weekDays, weekdayOrder, type WeekStart } from '@/lib/dates'
 import { formatKey, useI18n } from '@/lib/i18n'
@@ -17,6 +17,7 @@ import { Pushpin } from '@/components/paper/Pushpin'
 import { noteRotation } from '@/domain/colors'
 import { useMemo, useRef } from 'react'
 import { PageTurn } from './PageTurn'
+import type { Collection } from '@/domain/collection'
 import { SlotLayoutContext, type Offset, type Rect, type SlotLayout } from './drag'
 
 export interface BoardProps {
@@ -37,6 +38,8 @@ export interface BoardProps {
   onMoveNote: (date: DateKey, offset: Offset | undefined) => void
   /** Direction of the last period change (−1 back, 1 forward, 0 jump) for page-turn transitions. */
   dirn: number
+  moods: Map<DateKey, Mood>
+  collection: Collection
 }
 
 function dimmedFor(status: SlotStatus, filter: WallFilter) {
@@ -62,6 +65,9 @@ function Slot(p: BoardProps & { date: DateKey; size: 'md' | 'lg'; enter?: { inde
       arrive={p.justPinned === p.date}
       offset={p.archives.get(p.date)?.offset}
       enter={p.enter}
+      mood={p.archives.get(p.date)?.mood ?? p.moods.get(p.date) ?? null}
+      pin={p.collection.pinFor(p.date)}
+      stamp={p.collection.stamp}
       onOpen={p.onOpen}
       onArrived={p.onArrived}
     />
@@ -219,9 +225,9 @@ export function DayBoard(p: BoardProps) {
                   <CircleDashed className="size-4" /> {status === 'ready' ? d.celebrate.readyToPin : status === 'today' ? d.wall.inProgress : d.wall.unfinished}
                 </p>
               )}
-              {status === 'pinned' && <DoneStamp size={84} label={d.stamp} className="absolute end-5 bottom-5" />}
+              {status === 'pinned' && <DoneStamp size={84} label={d.stamp} variant={p.collection.stamp} className="absolute end-5 bottom-5" />}
             </Paper>
-            {status === 'pinned' && <Pushpin size={26} className="-top-2 left-1/2 -ml-[13px]" />}
+            {status === 'pinned' && <Pushpin size={26} color={p.collection.pinFor(p.anchor)} className="-top-2 left-1/2 -ml-[13px]" />}
           </button>
         ) : (
           <p className="chalk font-hand py-24 text-center text-[30px]">{d.wall.emptyDay}</p>

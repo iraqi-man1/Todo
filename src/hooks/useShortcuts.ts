@@ -10,7 +10,7 @@ import { useToday } from './useToday'
 export function goToToday(today: string) {
   const ui = useUI.getState()
   if (ui.route.name === 'wall') {
-    ui.setWall({ wallAnchor: null, wallView: ui.wallView === 'year' ? 'month' : ui.wallView })
+    ui.setWall({ wallAnchor: null, wallView: ui.wallView === 'year' || ui.wallView === 'goals' ? 'month' : ui.wallView })
     ui.requestWallFocus(today)
   } else ui.navigate({ name: 'today' })
 }

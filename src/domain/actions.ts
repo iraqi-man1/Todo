@@ -8,7 +8,9 @@ import type {
   DateKey,
   DayMeta,
   DayNote,
+  Goal,
   NoteColor,
+  Subtask,
   Prefs,
   Priority,
   Recurrence,
@@ -77,6 +79,8 @@ export interface TaskInput {
   dueTime?: string | null
   categoryId?: string | null
   recurrenceId?: string | null
+  goalId?: string | null
+  subtasks?: Subtask[]
 }
 
 export async function addTask(
@@ -103,6 +107,8 @@ export async function addTask(
     completedAt: null,
     order: siblings.length ? Math.max(...siblings.map((t) => t.order)) + 1 : 0,
     recurrenceId: input.recurrenceId ?? null,
+    goalId: input.goalId ?? null,
+    subtasks: input.subtasks?.filter((s) => s.title.trim()) ?? [],
     rescheduledTo: null,
     rescheduledFrom: null,
     createdAt: now(),
@@ -114,7 +120,7 @@ export async function addTask(
 
 export async function updateTask(
   id: string,
-  patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'dueTime' | 'categoryId' | 'noteId'>>,
+  patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'dueTime' | 'categoryId' | 'noteId' | 'goalId' | 'subtasks'>>,
 ) {
   const task = await db.tasks.get(id)
   if (!task) return
@@ -173,9 +179,64 @@ export async function reorderTasks(noteId: string, orderedIds: string[]) {
   })
 }
 
+/**
+ * Tick a subtask. Finishing the last open subtask also completes the task itself; reopening a subtask
+ * leaves the task's own state alone (the user may have finished it another way).
+ */
+export async function setSubtaskDone(taskId: string, subId: string, done: boolean) {
+  const task = await db.tasks.get(taskId)
+  if (!task) return
+  await assertEditable(task.date)
+  const subtasks = (task.subtasks ?? []).map((s) => (s.id === subId ? { ...s, done } : s))
+  const allDone = subtasks.length > 0 && subtasks.every((s) => s.done)
+  await db.tasks.update(taskId, {
+    subtasks,
+    ...(allDone && !task.completed ? { completed: true, completedAt: now() } : {}),
+    updatedAt: now(),
+  })
+}
+
+// ---------------- Goals ----------------
+
+export interface GoalProgress {
+  done: number
+  total: number
+  target: number
+  percentage: number
+  achieved: boolean
+}
+
+/** Pure: progress of a goal from its linked tasks. With a target, counts toward it; else all linked. */
+export function goalProgress(goal: Pick<Goal, 'target'>, tasks: Pick<Task, 'completed'>[]): GoalProgress {
+  const done = tasks.filter((t) => t.completed).length
+  const target = goal.target && goal.target > 0 ? goal.target : tasks.length
+  const percentage = target > 0 ? Math.min(100, Math.round((done / target) * 100)) : 0
+  return { done, total: tasks.length, target, percentage, achieved: target > 0 && done >= target }
+}
+
+export async function addGoal(input: Pick<Goal, 'title' | 'description' | 'color' | 'target' | 'dueDate'>): Promise<Goal> {
+  const title = input.title.trim()
+  if (!title) throw new Error('Goal title is required')
+  const g: Goal = { ...input, title, id: uid(), achievedAt: null, createdAt: now(), updatedAt: now() }
+  await db.goals.add(g)
+  return g
+}
+
+export async function updateGoal(id: string, patch: Partial<Pick<Goal, 'title' | 'description' | 'color' | 'target' | 'dueDate' | 'achievedAt'>>) {
+  await db.goals.update(id, { ...patch, updatedAt: now() })
+}
+
+/** Remove a goal; its tasks stay, just unlinked. */
+export async function deleteGoal(id: string) {
+  await db.transaction('rw', db.goals, db.tasks, async () => {
+    await db.tasks.where('goalId').equals(id).modify({ goalId: null })
+    await db.goals.delete(id)
+  })
+}
+
 // ---------------- Day meta ----------------
 
-export async function setDayMeta(date: DateKey, patch: Partial<Pick<DayMeta, 'title' | 'personalNote'>>) {
+export async function setDayMeta(date: DateKey, patch: Partial<Pick<DayMeta, 'title' | 'personalNote' | 'mood'>>) {
   const existing = await db.days.get(date)
   await db.days.put({ date, title: '', personalNote: '', ...existing, ...patch, updatedAt: now() })
   // Metadata is not part of the task history, so it may be edited on an archived snapshot too.
@@ -216,6 +277,7 @@ export async function archiveDay(date: DateKey): Promise<ArchiveResult> {
       date,
       title: meta?.title ?? '',
       personalNote: meta?.personalNote ?? '',
+      mood: meta?.mood ?? null,
       color: notes[0]?.color ?? 'yellow',
       notes: notes.map((n) => ({ id: n.id, title: n.title, color: n.color })),
       tasks: sorted.map((t) => {
@@ -231,6 +293,8 @@ export async function archiveDay(date: DateKey): Promise<ArchiveResult> {
           completed: t.completed,
           completedAt: t.completedAt,
           noteId: t.noteId,
+          subtasks: t.subtasks?.length ? t.subtasks.map((s) => ({ ...s })) : undefined,
+          goalId: t.goalId ?? null,
         }
       }),
       total: summary.total,
@@ -446,10 +510,10 @@ export function nextNoteColor(used: NoteColor[], preferred: NoteColor): NoteColo
 export async function clearAllData() {
   await db.transaction(
     'rw',
-    [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers],
+    [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers, db.goals],
     async () => {
       await Promise.all(
-        [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers].map(
+        [db.tasks, db.notes, db.days, db.archives, db.categories, db.recurrences, db.recurrenceRuns, db.achievements, db.wallpapers, db.goals].map(
           (t) => t.clear(),
         ),
       )

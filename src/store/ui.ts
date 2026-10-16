@@ -9,7 +9,7 @@ export interface Route {
   date?: DateKey
 }
 
-export type WallView = 'day' | 'week' | 'month' | 'year'
+export type WallView = 'day' | 'week' | 'month' | 'year' | 'goals'
 export type WallFilter = 'all' | 'complete' | 'incomplete'
 
 export function parseHash(hash: string): Route {
@@ -86,7 +86,7 @@ export const useUI = create<UIState>((set) => ({
   },
   setRouteFromHash: () => set({ route: parseHash(window.location.hash) }),
 
-  wallView: readChoice('dw-wall-view', ['day', 'week', 'month', 'year'] as const, 'month'),
+  wallView: readChoice('dw-wall-view', ['day', 'week', 'month', 'year', 'goals'] as const, 'month'),
   wallAnchor: null,
   wallFilter: readChoice('dw-wall-filter', ['all', 'complete', 'incomplete'] as const, 'all'),
   setWall: (p) => {

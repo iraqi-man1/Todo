@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { db } from '@/db/db'
 import { earnedAchievements } from '@/domain/achievements'
+import { itemsUnlockedBy } from '@/domain/collection'
 import { overallStats } from '@/domain/stats'
 import { useI18n } from '@/lib/i18n'
 import { playSound } from '@/lib/sound'
@@ -30,7 +31,12 @@ export function useAchievementWatcher() {
       fresh.forEach((id, i) =>
         setTimeout(() => {
           playSound('chime')
-          toast(d.achievements.unlocked, { description: d.achievements[id].name, icon: '🏅' })
+          const items = itemsUnlockedBy(id)
+          const names = [...items.pins.map((p) => d.collection.pinNames[p]), ...items.stamps.map((s) => d.collection.stampNames[s])]
+          toast(d.achievements.unlocked, {
+            description: names.length ? `${d.achievements[id].name} · ${d.collection.newItem.replace('{name}', names.join(', '))}` : d.achievements[id].name,
+            icon: '🏅',
+          })
         }, 1600 + i * 900),
       )
     })()

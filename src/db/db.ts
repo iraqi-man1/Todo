@@ -10,6 +10,7 @@ import type {
   RecurrenceRun,
   Task,
   Wallpaper,
+  Goal,
 } from '@/domain/types'
 
 export class DoneWallDB extends Dexie {
@@ -23,6 +24,7 @@ export class DoneWallDB extends Dexie {
   achievements!: Table<AchievementRecord, string>
   prefs!: Table<Prefs, string>
   wallpapers!: Table<Wallpaper, string>
+  goals!: Table<Goal, string>
 
   constructor(name = 'donewall', deps?: { indexedDB: IDBFactory; IDBKeyRange: typeof IDBKeyRange }) {
     super(name, deps)
@@ -41,6 +43,11 @@ export class DoneWallDB extends Dexie {
     // v2: locally stored custom wallpapers. Additive; existing data is untouched.
     this.version(2).stores({
       wallpapers: 'id, hash, createdAt',
+    })
+    // v3: big goals, and an index so a goal's tasks can be found quickly. Additive.
+    this.version(3).stores({
+      tasks: 'id, date, noteId, recurrenceId, updatedAt, goalId',
+      goals: 'id, createdAt',
     })
   }
 }

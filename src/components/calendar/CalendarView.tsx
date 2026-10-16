@@ -5,9 +5,9 @@ import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { NOTE_HEX } from '@/domain/colors'
 import { rangeStats } from '@/domain/stats'
-import type { Archive, DateKey } from '@/domain/types'
+import { MOOD_EMOJI, type Archive, type DateKey } from '@/domain/types'
 import { slotStatus } from '@/components/wall/WallNote'
-import { useArchives, useSummaries } from '@/hooks/useData'
+import { useArchives, useMoods, useSummaries } from '@/hooks/useData'
 import { dur, useMotionLevel } from '@/hooks/useMotionLevel'
 import { useToday } from '@/hooks/useToday'
 import { fromKey, monthDays, monthGrid, toKey, weekdayOrder } from '@/lib/dates'
@@ -26,6 +26,7 @@ export function CalendarView() {
   const [month, setMonth] = useState(() => today.slice(0, 8) + '01')
   const [dirn, setDirn] = useState(0)
   const summaries = useSummaries()
+  const moods = useMoods()
   const archivesList = useArchives()
   const archives = useMemo(() => new Map<DateKey, Archive>((archivesList ?? []).map((a) => [a.date, a])), [archivesList])
   const cells = monthGrid(month, prefs.weekStartsOn)
@@ -116,7 +117,7 @@ export function CalendarView() {
                     key={k}
                     type="button"
                     onClick={() => open(k)}
-                    aria-label={f(d.calendar.dayLabel, { date: date(k, 'long'), status: statusLabel(k) })}
+                    aria-label={`${f(d.calendar.dayLabel, { date: date(k, 'long'), status: statusLabel(k) })}${moods.get(k) ? `, ${d.mood.labels[moods.get(k)!]}` : ''}`}
                     aria-current={isToday ? 'date' : undefined}
                     className={cn(
                       'group relative flex aspect-square flex-col items-center justify-center rounded-xl text-[15px] transition-colors hover:bg-surface-2 sm:aspect-[1/0.9]',
@@ -144,6 +145,11 @@ export function CalendarView() {
                           </span>
                         )}
                       </>
+                    )}
+                    {moods.get(k) && (
+                      <span aria-hidden className="pointer-events-none absolute end-0.5 top-0.5 text-[11px] leading-none sm:text-[13px]">
+                        {MOOD_EMOJI[moods.get(k)!]}
+                      </span>
                     )}
                   </button>
                 )
