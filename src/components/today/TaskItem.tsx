@@ -21,6 +21,8 @@ export interface TaskItemProps {
   sortable?: boolean
   onToggle: (task: Task) => void
   onEdit: (task: Task) => void
+  /** Quick inline rename; when absent, clicking the title opens the full editor. */
+  onRename?: (task: Task, title: string) => void
   onDelete: (task: Task) => void
 }
 
@@ -47,6 +49,7 @@ function TaskRow({
   editable,
   onToggle,
   onEdit,
+  onRename,
   onDelete,
   dragging,
   handleProps,
@@ -56,6 +59,7 @@ function TaskRow({
   const box = useAnimationControls()
   const swiped = useRef(false)
   const [moving, setMoving] = useState(false)
+  const [renaming, setRenaming] = useState(false)
   const moved = !!task.rescheduledTo
   const canToggle = editable && !moved
 
@@ -79,7 +83,7 @@ function TaskRow({
         </div>
       )}
       <motion.div
-        drag={editable && level !== 'off' ? 'x' : false}
+        drag={editable && !renaming && level !== 'off' ? 'x' : false}
         dragDirectionLock
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: dir === 'rtl' ? 0.05 : 0.6, right: dir === 'rtl' ? 0.6 : 0.05 }}
@@ -96,7 +100,8 @@ function TaskRow({
         style={{ touchAction: 'pan-y' }}
         className={cn(
           'group relative flex min-h-[52px] items-start gap-1.5 rounded-lg py-2 pe-1 ps-0.5',
-          'transition-shadow',
+          'transition-[box-shadow,background-color] duration-150',
+          editable && !moving && !dragging && 'hover:bg-black/[0.035]',
           (moving || dragging) && 'bg-[var(--note-bg)]',
           dragging && 'shadow-lift ring-1 ring-black/5',
         )}
@@ -135,9 +140,23 @@ function TaskRow({
           {level === 'full' && <Sparkles key={burst} active={burst > 0} />}
         </div>
 
+        {renaming ? (
+          <InlineTitle
+            initial={task.title}
+            onCancel={() => setRenaming(false)}
+            onSave={(title) => {
+              setRenaming(false)
+              if (title && title !== task.title) onRename?.(task, title)
+            }}
+            onDetails={() => {
+              setRenaming(false)
+              onEdit(task)
+            }}
+          />
+        ) : (
         <button
           type="button"
-          onClick={() => !swiped.current && editable && onEdit(task)}
+          onClick={() => !swiped.current && editable && (onRename && !moved ? setRenaming(true) : onEdit(task))}
           disabled={!editable}
           className="min-w-0 flex-1 cursor-text py-1 text-start disabled:cursor-default"
           aria-label={`${task.title}${editable ? `, ${d.task.edit}` : ''}`}
@@ -175,6 +194,7 @@ function TaskRow({
             </span>
           )}
         </button>
+        )}
 
         {editable && (
           <DropdownMenu>
@@ -186,7 +206,7 @@ function TaskRow({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => onEdit(task)}>
-                <Pencil /> {d.task.edit}
+                <Pencil /> {d.task.editDetails}
               </DropdownMenuItem>
               <DropdownMenuItem danger onSelect={() => onDelete(task)}>
                 <Trash2 /> {d.task.delete}
@@ -258,5 +278,45 @@ function Sparkles({ active }: { active: boolean }) {
         </span>
       )}
     </AnimatePresence>
+  )
+}
+
+/** In-place title editor: Enter saves, Escape cancels, Shift+Enter opens the full editor. */
+function InlineTitle({ initial, onSave, onCancel, onDetails }: { initial: string; onSave: (v: string) => void; onCancel: () => void; onDetails: () => void }) {
+  const { d } = useI18n()
+  const [v, setV] = useState(initial)
+  const done = useRef(false)
+  const finish = (fn: () => void) => {
+    if (done.current) return
+    done.current = true
+    fn()
+  }
+  return (
+    <div className="min-w-0 flex-1 py-0.5">
+      <input
+        autoFocus
+        value={v}
+        maxLength={200}
+        aria-label={d.task.title}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && e.shiftKey) {
+            e.preventDefault()
+            finish(onDetails)
+          } else if (e.key === 'Enter') {
+            e.preventDefault()
+            finish(() => onSave(v.trim()))
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            e.stopPropagation()
+            finish(onCancel)
+          }
+        }}
+        onBlur={() => finish(() => onSave(v.trim()))}
+        className="h-9 w-full rounded-md bg-white/55 px-2 text-[15px] text-[#302c28] shadow-[inset_0_0_0_1px_rgb(48_44_40/0.18)] outline-none focus:shadow-[inset_0_0_0_1.5px_rgb(128_91_61/0.6)]"
+      />
+      <span className="mt-1 block px-0.5 text-[11px] text-[#302c28]/55">{d.task.inlineHint}</span>
+    </div>
   )
 }

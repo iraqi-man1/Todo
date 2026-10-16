@@ -377,6 +377,27 @@ body {
     opacity: 0.35;
   }
 }
+@keyframes dw-flicker {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  42% {
+    opacity: 0.9;
+  }
+  46% {
+    opacity: 0.15;
+  }
+  60% {
+    opacity: 0.15;
+  }
+  64% {
+    opacity: 0.8;
+  }
+}
+.dw-flicker {
+  animation: dw-flicker 14s ease-in-out infinite;
+}
 @keyframes dw-lamp {
   50% {
     opacity: calc(var(--lamp) * 0.92);
@@ -391,6 +412,8 @@ body {
 .dw-lamp-breathe {
   animation: dw-lamp 9s ease-in-out infinite;
 }
+:root.still .dw-flicker,
+:root.motion-reduced .dw-flicker,
 :root.still .dw-clouds,
 :root.still .dw-twinkle,
 :root.still .dw-lamp-breathe,
@@ -420,4 +443,23 @@ body {
 :root.focus-mode [data-note-idle]:focus-within {
   opacity: 1;
   filter: none;
+}
+
+/* ---------- Tooltips ---------- */
+@keyframes dw-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px) scale(0.98);
+  }
+}
+.dw-tip[data-state='delayed-open'],
+.dw-tip[data-state='instant-open'] {
+  animation: dw-tip-in 0.16s var(--ease-paper);
+}
+
+.dw-palette[data-state='open'] {
+  animation: dw-pop 0.22s var(--ease-paper);
+}
+.dw-palette[data-state='closed'] {
+  animation: dw-pop-out 0.12s ease-in forwards;
 }

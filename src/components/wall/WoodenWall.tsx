@@ -1,6 +1,11 @@
 import { addMonths, addWeeks, addYears } from 'date-fns'
-import { ChevronLeft, ChevronRight, Filter, LocateFixed, Minus, Plus, Search } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
+import { CalendarCheck, ChevronLeft, ChevronRight, Filter, Maximize2, Minus, Plus, Search } from 'lucide-react'
+import { AnimatePresence, motion, useTransform, type MotionValue } from 'motion/react'
+import { Tip } from '@/components/ui/tooltip'
+import { setArchiveOffset } from '@/domain/actions'
+import { record } from '@/store/history'
+import { goToToday } from '@/hooks/useShortcuts'
+import { WallGestureContext, type Offset, type WallGesture } from './drag'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -53,7 +58,10 @@ export function WoodenWall() {
   const dateInput = useRef<HTMLInputElement>(null)
   const ready = !!archivesList && !!summaries
 
+  const [dirn, setDirn] = useState(0)
+  const wallFocus = useUI((s) => s.wallFocus)
   const shift = (n: number) => {
+    setDirn(n)
     const a = fromKey(anchor)
     const next =
       view === 'day' ? addDaysKey(anchor, n) : toKey(view === 'week' ? addWeeks(a, n) : view === 'month' ? addMonths(a, n) : addYears(a, n))
@@ -101,6 +109,24 @@ export function WoodenWall() {
 
   const onArrived = useCallback(() => setJustPinned(null), [setJustPinned])
 
+  // "Go to today" and other focus requests: centre that date's note once its board is on screen.
+  useEffect(() => {
+    if (!ready || !wallFocus) return
+    const t = setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[data-date="${wallFocus.date}"]`)
+      if (el) vp.current?.focusElement(el, { minScreenWidth: narrow ? 110 : 170 })
+    }, 120)
+    return () => clearTimeout(t)
+  }, [ready, wallFocus, narrow])
+
+  const onMoveNote = useCallback((key: DateKey, offset: Offset | undefined) => {
+    const before = archives.get(key)?.offset
+    void setArchiveOffset(key, offset)
+    record({ label: 'noteMoved', undo: () => setArchiveOffset(key, before), redo: () => setArchiveOffset(key, offset) })
+  }, [archives])
+
+  const gesture = useMemo<WallGesture>(() => ({ cancelPan: () => vp.current?.cancelGesture(), scale: () => vp.current?.scale() ?? 1 }), [])
+
   // Keyboard: arrows pan, +/- zoom, 0 resets.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -141,7 +167,11 @@ export function WoodenWall() {
         inspecting: inspect?.date ?? null,
         onOpen,
         onArrived,
-        onPickMonth: (m) => setWall({ wallView: 'month', wallAnchor: m }),
+        onPickMonth: (m) => {
+          setDirn(0)
+          setWall({ wallView: 'month', wallAnchor: m })
+        },
+        onMoveNote,
       }
     : null
 
@@ -156,15 +186,20 @@ export function WoodenWall() {
         <Segmented
           label={d.wall.viewLabel}
           value={view}
-          onChange={(v) => setWall({ wallView: v })}
+          onChange={(v) => {
+            setDirn(0)
+            setWall({ wallView: v })
+          }}
           size="sm"
           options={views.map((v) => ({ value: v, label: d.wall.views[v] }))}
           className="order-3 w-full sm:order-none sm:w-auto [&>button]:flex-1"
         />
         <div className="flex min-w-0 flex-1 items-center gap-0.5 sm:flex-none">
-          <Button variant="ghost" size="iconSm" onClick={() => shift(-1)} aria-label={d.wall.prev}>
-            <ChevronLeft className="rtl:rotate-180" />
-          </Button>
+          <Tip label={d.wall.prev}>
+            <Button variant="ghost" size="iconSm" onClick={() => shift(-1)} aria-label={d.wall.prev}>
+              <ChevronLeft className="rtl:rotate-180" />
+            </Button>
+          </Tip>
           <button
             type="button"
             className="relative min-w-0 truncate rounded-lg px-2 py-1.5 text-[15px] font-semibold hover:bg-surface-2"
@@ -189,22 +224,33 @@ export function WoodenWall() {
               onChange={(e) => e.target.value && setWall({ wallAnchor: e.target.value })}
             />
           </button>
-          <Button variant="ghost" size="iconSm" onClick={() => shift(1)} aria-label={d.wall.next}>
-            <ChevronRight className="rtl:rotate-180" />
-          </Button>
+          <Tip label={d.wall.next}>
+            <Button variant="ghost" size="iconSm" onClick={() => shift(1)} aria-label={d.wall.next}>
+              <ChevronRight className="rtl:rotate-180" />
+            </Button>
+          </Tip>
         </div>
         <div className="ms-auto flex items-center gap-1">
           {anchor !== today && (
-            <Button variant="subtle" size="sm" onClick={() => setWall({ wallAnchor: null })}>
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() => {
+                setDirn(anchor < today ? 1 : -1)
+                goToToday(today)
+              }}
+            >
               {d.wall.today}
             </Button>
           )}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="iconSm" aria-label={`${d.wall.filter}: ${d.wall.filters[filter]}`} className={cn(filter !== 'all' && 'bg-note-yellow text-[#302c28]')}>
-                <Filter />
-              </Button>
-            </DropdownMenuTrigger>
+            <Tip label={`${d.wall.filter}: ${d.wall.filters[filter]}`}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="iconSm" aria-label={`${d.wall.filter}: ${d.wall.filters[filter]}`} className={cn(filter !== 'all' && 'bg-note-yellow text-[#302c28]')}>
+                  <Filter />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tip>
             <DropdownMenuContent align="end">
               {filters.map((fl) => (
                 <DropdownMenuItem key={fl} onSelect={() => setWall({ wallFilter: fl })} aria-checked={filter === fl} role="menuitemradio">
@@ -214,45 +260,61 @@ export function WoodenWall() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="ghost" size="iconSm" onClick={() => setSearchOpen(true)} aria-label={d.wall.search}>
-            <Search />
-          </Button>
+          <Tip label={d.wall.search} shortcut="/">
+            <Button variant="ghost" size="iconSm" onClick={() => setSearchOpen(true)} aria-label={d.wall.search}>
+              <Search />
+            </Button>
+          </Tip>
         </div>
       </div>
 
       {/* Wall */}
       <div className="relative min-h-0 flex-1">
         {boardProps && (
-          <WallViewport ref={vp} fitKey={fitKey} fit={view === 'year' && narrow ? 'width' : view === 'month' && narrow ? 'width' : 'contain'} level={level} label={`${d.wall.title}: ${periodLabel}`}>
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.div
-                key={fitKey}
-                initial={level === 'off' ? false : { opacity: 0, scale: level === 'full' ? 0.97 : 1 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={level === 'off' ? undefined : { opacity: 0, transition: { duration: 0.12 } }}
-                transition={{ duration: dur(level, 0.3) }}
-              >
-                {view === 'month' && <MonthBoard {...boardProps} />}
-                {view === 'week' && <WeekBoard {...boardProps} />}
-                {view === 'year' && <YearBoard {...boardProps} />}
-                {view === 'day' && <DayBoard {...boardProps} />}
-              </motion.div>
-            </AnimatePresence>
-          </WallViewport>
+          <WallGestureContext.Provider value={gesture}>
+            <WallViewport
+              ref={vp}
+              persist
+              fitKey={fitKey}
+              fit={(view === 'year' || view === 'month') && narrow ? 'width' : 'contain'}
+              level={level}
+              label={`${d.wall.title}: ${periodLabel}`}
+              overlay={(scale) => (
+                <ZoomControls
+                  scale={scale}
+                  onZoom={(k) => vp.current?.zoomBy(k)}
+                  onFit={() => vp.current?.reset()}
+                  onToday={() => {
+                    setDirn(anchor < today ? 1 : anchor > today ? -1 : 0)
+                    goToToday(today)
+                  }}
+                />
+              )}
+            >
+              <AnimatePresence mode="popLayout" initial={false} custom={dirn}>
+                <motion.div
+                  key={fitKey}
+                  custom={dirn}
+                  variants={{
+                    enter: (dn: number) => (level === 'off' ? {} : { opacity: 0, x: level === 'full' ? dn * 70 : 0, scale: dn || level !== 'full' ? 1 : 0.97 }),
+                    center: { opacity: 1, x: 0, scale: 1 },
+                    exit: (dn: number) => (level === 'off' ? {} : { opacity: 0, x: level === 'full' ? dn * -70 : 0, transition: { duration: 0.16 } }),
+                  }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: dur(level, 0.32), ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {view === 'month' && <MonthBoard {...boardProps} />}
+                  {view === 'week' && <WeekBoard {...boardProps} />}
+                  {view === 'year' && <YearBoard {...boardProps} />}
+                  {view === 'day' && <DayBoard {...boardProps} />}
+                </motion.div>
+              </AnimatePresence>
+            </WallViewport>
+          </WallGestureContext.Provider>
         )}
 
-        {/* Zoom controls */}
-        <div className="absolute end-3 bottom-3 flex flex-col overflow-hidden rounded-2xl border border-line bg-surface/90 shadow-soft backdrop-blur-md">
-          <button type="button" className="grid size-11 place-items-center hover:bg-surface-2" onClick={() => vp.current?.zoomBy(1.3)} aria-label={d.wall.zoomIn}>
-            <Plus className="size-5" />
-          </button>
-          <button type="button" className="grid size-11 place-items-center border-y border-line hover:bg-surface-2" onClick={() => vp.current?.zoomBy(1 / 1.3)} aria-label={d.wall.zoomOut}>
-            <Minus className="size-5" />
-          </button>
-          <button type="button" className="grid size-11 place-items-center hover:bg-surface-2" onClick={() => vp.current?.reset()} aria-label={d.wall.reset}>
-            <LocateFixed className="size-5" />
-          </button>
-        </div>
         <p className="pointer-events-none absolute start-3 bottom-3 hidden rounded-full bg-surface/80 px-3 py-1.5 text-xs text-ink-soft backdrop-blur sm:block">{d.wall.hint}</p>
       </div>
 
@@ -266,6 +328,41 @@ export function WoodenWall() {
           setTimeout(() => setInspect({ date: key }), 150)
         }}
       />
+    </div>
+  )
+}
+
+/** Zoom in/out, a live zoom readout, fit-to-screen and jump-to-today. Reads scale without re-rendering the wall. */
+function ZoomControls({ scale, onZoom, onFit, onToday }: { scale: MotionValue<number>; onZoom: (k: number) => void; onFit: () => void; onToday: () => void }) {
+  const { d } = useI18n()
+  const pct = useTransform(scale, (v) => `${Math.round(v * 100)}%`)
+  const btn = 'grid size-11 place-items-center text-ink transition-colors hover:bg-surface-2 active:scale-95'
+  return (
+    <div className="pointer-events-auto absolute end-3 bottom-3 flex flex-col items-center overflow-hidden rounded-2xl border border-line bg-surface/90 shadow-soft backdrop-blur-md">
+      <Tip label={d.wall.zoomIn} side="left" shortcut="+">
+        <button type="button" className={btn} onClick={() => onZoom(1.3)} aria-label={d.wall.zoomIn}>
+          <Plus className="size-5" />
+        </button>
+      </Tip>
+      <motion.span aria-hidden className="w-full border-y border-line py-1 text-center text-[11px] font-semibold tabular-nums text-ink-soft">
+        {pct}
+      </motion.span>
+      <Tip label={d.wall.zoomOut} side="left" shortcut="−">
+        <button type="button" className={btn} onClick={() => onZoom(1 / 1.3)} aria-label={d.wall.zoomOut}>
+          <Minus className="size-5" />
+        </button>
+      </Tip>
+      <span className="h-px w-full bg-line" />
+      <Tip label={d.wall.reset} side="left" shortcut="0">
+        <button type="button" className={btn} onClick={onFit} aria-label={d.wall.reset}>
+          <Maximize2 className="size-[18px]" />
+        </button>
+      </Tip>
+      <Tip label={d.shortcuts.today} side="left" shortcut="T">
+        <button type="button" className={btn} onClick={onToday} aria-label={d.shortcuts.today}>
+          <CalendarCheck className="size-[18px]" />
+        </button>
+      </Tip>
     </div>
   )
 }

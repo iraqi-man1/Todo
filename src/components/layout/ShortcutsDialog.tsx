@@ -9,6 +9,10 @@ export function ShortcutsDialog() {
   const rows: [string[], string][] = [
     [['1', '–', '5'], d.shortcuts.nav],
     [['N'], d.shortcuts.newTask],
+    [['T'], d.shortcuts.today],
+    [['Ctrl', 'K'], d.shortcuts.palette],
+    [['Ctrl', 'Z'], d.history.undo],
+    [['Ctrl', '⇧', 'Z'], d.history.redo],
     [['/'], d.shortcuts.search],
     [['F'], d.shortcuts.focus],
     [['+', '−'], d.shortcuts.zoom],

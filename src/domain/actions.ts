@@ -244,6 +244,55 @@ export async function archiveDay(date: DateKey): Promise<ArchiveResult> {
   })
 }
 
+/** Save where the user nudged a pinned note within its slot. Layout only; the snapshot itself is untouched. */
+export async function setArchiveOffset(date: DateKey, offset: { x: number; y: number } | undefined) {
+  const a = await db.archives.where('date').equals(date).first()
+  if (a) await db.archives.update(a.id, { offset, updatedAt: now() })
+}
+
+// ---------------- Snapshot restore (used by undo/redo) ----------------
+
+/** Put a task back exactly as it was (or remove it if it did not exist). Respects pinned-day locks. */
+export async function applyTaskSnapshot(id: string, snap: Task | undefined) {
+  const current = await db.tasks.get(id)
+  const date = snap?.date ?? current?.date
+  if (date) await assertEditable(date)
+  if (snap) {
+    if (!(await db.notes.get(snap.noteId))) throw new Error('Note no longer exists')
+    await db.tasks.put(snap)
+  } else await db.tasks.delete(id)
+}
+
+export async function applyTaskSnapshots(snaps: Task[]) {
+  if (!snaps.length) return
+  await assertEditable(snaps[0].date)
+  await db.tasks.bulkPut(snaps)
+}
+
+/** Restore a note together with its tasks, or remove both. */
+export async function applyNoteSnapshot(id: string, note: DayNote | undefined, tasks: Task[]) {
+  const current = await db.notes.get(id)
+  const date = note?.date ?? current?.date
+  if (date) await assertEditable(date)
+  await db.transaction('rw', db.notes, db.tasks, async () => {
+    if (note) {
+      await db.notes.put(note)
+      const keep = new Set(tasks.map((t) => t.id))
+      await db.tasks.where('noteId').equals(id).filter((t) => !keep.has(t.id)).delete()
+      await db.tasks.bulkPut(tasks)
+    } else {
+      await db.tasks.where('noteId').equals(id).delete()
+      await db.notes.delete(id)
+    }
+  })
+}
+
+/** Put a removed wall snapshot back (undo of unpin). Never overwrites a different snapshot for the date. */
+export async function restoreArchive(archive: Archive) {
+  const existing = await db.archives.where('date').equals(archive.date).first()
+  if (!existing) await db.archives.put(archive)
+}
+
 /** Explicitly take a day off the wall so its tasks can be edited again. Live tasks are untouched. */
 export async function unarchiveDay(date: DateKey) {
   await db.archives.where('date').equals(date).delete()

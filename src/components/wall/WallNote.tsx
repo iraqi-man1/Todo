@@ -1,6 +1,7 @@
 import { CircleDashed, Plus } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useEffect } from 'react'
+import { memo, useEffect } from 'react'
+import { DraggableNote, type Offset } from './drag'
 import { DoneStamp } from '@/components/paper/DoneStamp'
 import { Pushpin, type PinColor } from '@/components/paper/Pushpin'
 import { Paper } from '@/components/paper/StickyNote'
@@ -36,12 +37,13 @@ export interface WallNoteProps {
   dimmed?: boolean
   hidden?: boolean
   arrive?: boolean
+  offset?: Offset
   onOpen: (date: DateKey, el: HTMLElement, rotate: number) => void
   onArrived?: () => void
 }
 
 /** One day's slot on the wall. Every state has text, not just color, so status never relies on color alone. */
-export function WallNote({ date, status, summary, archive, fallbackColor, size, level, dimmed, hidden, arrive, onOpen, onArrived }: WallNoteProps) {
+export const WallNote = memo(function WallNote({ date, status, summary, archive, fallbackColor, size, level, dimmed, hidden, arrive, offset, onOpen, onArrived }: WallNoteProps) {
   const { d, f, date: fmt } = useI18n()
   const rot = noteRotation(date)
   const lg = size === 'lg'
@@ -75,7 +77,7 @@ export function WallNote({ date, status, summary, archive, fallbackColor, size, 
         className={cn(
           dims,
           'relative flex flex-col items-center justify-center rounded-[4px] transition-opacity',
-          status === 'today' ? 'border-2 border-dashed border-[rgb(255_248_235/0.55)] hover:bg-white/5' : 'border border-[rgb(255_248_235/0.13)]',
+          status === 'today' ? 'border-2 border-dashed border-[rgb(255_248_235/0.7)] bg-black/[0.06] hover:bg-white/10' : 'border border-[rgb(255_248_235/0.13)]',
           dimmed && 'opacity-30',
         )}
       >
@@ -83,7 +85,7 @@ export function WallNote({ date, status, summary, archive, fallbackColor, size, 
           {fmt(date, 'day')}
         </span>
         {status === 'today' && (
-          <span className="chalk mt-2 flex items-center gap-1 text-[13px] font-semibold tracking-wide uppercase">
+          <span className="chalk mt-2 flex items-center gap-1 text-[13px] font-semibold tracking-wide text-[rgb(255_248_235/0.92)] uppercase">
             <Plus className="size-3.5" /> {d.wall.statusToday}
           </span>
         )}
@@ -122,6 +124,7 @@ export function WallNote({ date, status, summary, archive, fallbackColor, size, 
   const pin = seededPick(date, PINS)
   const full = level === 'full'
   return (
+    <DraggableNote date={date} offset={offset} level={level} enabled={pinned && !arrive}>
     <motion.button
       type="button"
       data-date={date}
@@ -167,5 +170,6 @@ export function WallNote({ date, status, summary, archive, fallbackColor, size, 
         <span aria-hidden className="absolute -top-2 left-1/2 h-5 w-14 -translate-x-1/2 rotate-[3deg] bg-[rgb(255_253_240/0.55)] shadow-[0_1px_2px_rgb(0_0_0/0.15)]" />
       )}
     </motion.button>
+    </DraggableNote>
   )
-}
+})

@@ -1,7 +1,7 @@
 /** Local calendar date in `yyyy-MM-dd` form. Assigned from the device's local time when created. */
 export type DateKey = string
 
-export const NOTE_COLORS = ['yellow', 'pink', 'mint', 'lavender', 'peach', 'blue'] as const
+export const NOTE_COLORS = ['yellow', 'pink', 'mint', 'lavender', 'peach', 'blue', 'sand', 'coral', 'aqua', 'rose'] as const
 export type NoteColor = (typeof NOTE_COLORS)[number]
 
 export const PRIORITIES = ['none', 'low', 'medium', 'high'] as const
@@ -72,6 +72,8 @@ export interface Archive {
   percentage: number
   archivedAt: number
   updatedAt: number
+  /** User nudge of the note inside its wall slot, in board pixels (snapped). */
+  offset?: { x: number; y: number }
 }
 
 export interface Category {
@@ -133,7 +135,10 @@ export interface Prefs {
   wood: WoodTheme
   motion: MotionPref
   sound: boolean
+  /** Sound effects volume */
   volume: number
+  /** Rain ambience volume, independent of effects */
+  ambientVolume: number
   weekStartsOn: 0 | 1 | 6
   language: Language
   dateFormat: DateFormatPref
@@ -160,6 +165,7 @@ export const DEFAULT_PREFS: Prefs = {
   motion: 'auto',
   sound: false,
   volume: 0.5,
+  ambientVolume: 0.4,
   weekStartsOn: 1,
   language: 'en',
   dateFormat: 'friendly',

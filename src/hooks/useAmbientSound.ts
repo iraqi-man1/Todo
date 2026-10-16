@@ -5,7 +5,7 @@ import { usePrefs } from '@/store/prefs'
 /** Plays rain ambience while enabled. Browsers require a gesture, so we wait for the first one. */
 export function useAmbientSound() {
   const on = usePrefs((s) => s.prefs.ambientSound)
-  const volume = usePrefs((s) => s.prefs.volume)
+  const volume = usePrefs((s) => s.prefs.ambientVolume)
   const intensity = usePrefs((s) => s.prefs.rainIntensity)
   useEffect(() => {
     if (!on) {

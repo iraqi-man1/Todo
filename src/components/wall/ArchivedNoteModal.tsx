@@ -1,6 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRightToLine, Check, CircleDashed, Clock, NotebookPen, Pin, X } from 'lucide-react'
+import { ArrowRightToLine, Check, CircleDashed, Clock, LocateFixed, NotebookPen, Pin, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -9,7 +9,8 @@ import { Paper } from '@/components/paper/StickyNote'
 import { Button } from '@/components/ui/button'
 import { Input, Textarea } from '@/components/ui/fields'
 import { db } from '@/db/db'
-import { archiveDay, rescheduleUnfinished, setDayMeta } from '@/domain/actions'
+import { rescheduleUnfinished, setArchiveOffset, setDayMeta } from '@/domain/actions'
+import { uPin } from '@/domain/undoable'
 import { NOTE_INK } from '@/domain/colors'
 import { percent } from '@/domain/summary'
 import type { ArchivedTask, DateKey, NoteColor } from '@/domain/types'
@@ -26,6 +27,7 @@ interface ViewModel {
   date: DateKey
   archived: boolean
   archivedAt: number | null
+  moved: boolean
   color: NoteColor
   title: string
   personalNote: string
@@ -45,6 +47,7 @@ function useViewModel(date: DateKey | undefined, fallback: NoteColor): ViewModel
         date,
         archived: true,
         archivedAt: archive.archivedAt,
+        moved: !!archive.offset,
         color: archive.color,
         title: archive.title,
         personalNote: archive.personalNote,
@@ -66,6 +69,7 @@ function useViewModel(date: DateKey | undefined, fallback: NoteColor): ViewModel
       date,
       archived: false,
       archivedAt: null,
+      moved: false,
       color: notes[0]?.color ?? fallback,
       title: meta?.title ?? '',
       personalNote: meta?.personalNote ?? '',
@@ -151,7 +155,7 @@ function ModalBody({ state, onClose }: { state: InspectState; onClose: () => voi
   const canMove = vm && !vm.archived && isPast && notDone.some((t) => !t.moved)
 
   const pinNow = async () => {
-    const res = await archiveDay(state.date).catch(reportError)
+    const res = await uPin(state.date).catch(reportError)
     if (res && res.ok) {
       playSound('paper')
       onClose()
@@ -267,6 +271,11 @@ function ModalBody({ state, onClose }: { state: InspectState; onClose: () => voi
                       }}
                     >
                       <ArrowRightToLine className="size-4 rtl:rotate-180" /> {d.detail.moveToToday}
+                    </button>
+                  )}
+                  {vm?.moved && (
+                    <button type="button" className={paperBtn} onClick={() => void setArchiveOffset(state.date, undefined).catch(reportError)}>
+                      <LocateFixed className="size-4" /> {d.detail.resetPosition}
                     </button>
                   )}
                   {canPin && (

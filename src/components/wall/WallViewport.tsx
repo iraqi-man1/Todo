@@ -1,4 +1,4 @@
-import { animate, motion, useMotionValue, type AnimationPlaybackControls } from 'motion/react'
+import { animate, motion, useMotionValue, type AnimationPlaybackControls, type MotionValue } from 'motion/react'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import type { MotionLevel } from '@/hooks/useMotionLevel'
 import { clamp, cn } from '@/lib/utils'
@@ -9,6 +9,8 @@ export interface WallViewportHandle {
   focusElement: (el: HTMLElement, opts?: { minScreenWidth?: number; animated?: boolean }) => void
   pan: (dx: number, dy: number) => void
   scale: () => number
+  /** Abort the in-progress pan/pinch (a note was picked up instead). */
+  cancelGesture: () => void
 }
 
 interface Props {
@@ -20,6 +22,32 @@ interface Props {
   label: string
   className?: string
   onScaleChange?: (s: number) => void
+  /** Remember the user's pan/zoom per `fitKey` across visits. */
+  persist?: boolean
+  /** Controls rendered over the wall; receive the live scale without re-rendering the board. */
+  overlay?: (scale: MotionValue<number>) => React.ReactNode
+}
+
+const STORE = 'dw-viewports'
+type Saved = Record<string, { x: number; y: number; s: number; t: number }>
+function readSaved(): Saved {
+  try {
+    return JSON.parse(localStorage.getItem(STORE) ?? '{}') as Saved
+  } catch {
+    return {}
+  }
+}
+function writeSaved(key: string, v: { x: number; y: number; s: number } | null) {
+  try {
+    const all = readSaved()
+    if (v) all[key] = { ...v, t: Date.now() }
+    else delete all[key]
+    // keep the 24 most recent views
+    const keep = Object.entries(all).sort((a, b) => b[1].t - a[1].t).slice(0, 24)
+    localStorage.setItem(STORE, JSON.stringify(Object.fromEntries(keep)))
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 const MIN = 0.12
@@ -32,7 +60,7 @@ const TAP_SLOP = 7
  * the wheel zooms around the cursor, and releasing a pan glides with inertia.
  */
 export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallViewport(
-  { children, fitKey, fit, level, label, className, onScaleChange },
+  { children, fitKey, fit, level, label, className, onScaleChange, persist, overlay },
   ref,
 ) {
   const outer = useRef<HTMLDivElement>(null)
@@ -134,7 +162,16 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
         const { cw, ch } = sizes()
         zoomAt(cw / 2, ch / 2, s.get() * factor, true)
       },
-      reset: (animated = true) => fitView(animated),
+      reset: (animated = true) => {
+        if (persist) writeSaved(fitKey, null)
+        fitView(animated)
+      },
+      cancelGesture: () => {
+        stop()
+        pointers.current.clear()
+        gesture.current.mode = 'idle'
+        dragged.current = true
+      },
       pan: (dx, dy) => go(x.get() + dx, y.get() + dy, s.get(), true),
       scale: () => s.get(),
       focusElement: (el, opts = {}) => {
@@ -156,7 +193,7 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
         go(cw / 2 - (ox + ew / 2) * sc, ch / 2 - (oy + eh / 2) * sc, sc, opts.animated ?? true)
       },
     }),
-    [fitView, go, s, sizes, x, y, zoomAt],
+    [fitKey, fitView, go, persist, s, sizes, x, y, zoomAt],
   )
 
   // Fit whenever the content key changes, once the board has a size.
@@ -164,8 +201,33 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
     if (fitted.current === fitKey) return
     const first = fitted.current === null
     fitted.current = fitKey
-    fitView(!first)
-  }, [fitKey, fitView])
+    const saved = persist ? readSaved()[fitKey] : undefined
+    if (saved) go(saved.x, saved.y, clamp(saved.s, MIN, MAX), false)
+    else fitView(!first)
+  }, [fitKey, fitView, go, persist])
+
+  // Save the view shortly after it settles.
+  useEffect(() => {
+    if (!persist) return
+    let t: ReturnType<typeof setTimeout> | undefined
+    const flush = () => {
+      if (t === undefined) return
+      clearTimeout(t)
+      t = undefined
+      if (fitted.current === fitKey) writeSaved(fitKey, { x: x.get(), y: y.get(), s: s.get() })
+    }
+    const save = () => {
+      clearTimeout(t)
+      t = setTimeout(flush, 400)
+    }
+    const offs = [x.on('change', save), y.on('change', save), s.on('change', save)]
+    window.addEventListener('pagehide', flush)
+    return () => {
+      flush()
+      window.removeEventListener('pagehide', flush)
+      offs.forEach((o) => o())
+    }
+  }, [fitKey, persist, s, x, y])
 
   // Keep the board sensible when the window or board size changes.
   useEffect(() => {
@@ -336,6 +398,11 @@ export const WallViewport = forwardRef<WallViewportHandle, Props>(function WallV
       <motion.div ref={inner} className="absolute top-0 left-0 w-max will-change-transform" style={{ x, y, scale: s, originX: 0, originY: 0 }}>
         {children}
       </motion.div>
+      {overlay && (
+        <div className="pointer-events-none absolute inset-0" onPointerDown={(e) => e.stopPropagation()}>
+          {overlay(s)}
+        </div>
+      )}
     </div>
   )
 })

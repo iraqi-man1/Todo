@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Input, Label, Segmented, Select, Textarea } from '@/components/ui/fields'
 import { db } from '@/db/db'
-import { addTask, createRecurrence, deleteRecurrence, updateTask } from '@/domain/actions'
+import { createRecurrence, deleteRecurrence } from '@/domain/actions'
+import { uAddTask, uUpdateTask } from '@/domain/undoable'
 import { PRIORITIES, type Priority, type RecurrenceFrequency, type Task } from '@/domain/types'
 import { useCategories } from '@/hooks/useData'
 import { fromKey, weekdayOrder } from '@/lib/dates'
@@ -85,6 +86,8 @@ function EditorBody() {
 
   const isEdit = !!editor.taskId
   if (isEdit && data && !data.task) return null
+  // Never show the edit form before the task has loaded, or a late load would overwrite typing.
+  if (!loaded) return null
 
   const save = async () => {
     const clean = title.trim()
@@ -103,10 +106,10 @@ function EditorBody() {
       }
       let task: Task | undefined
       if (isEdit) {
-        await updateTask(editor.taskId!, { ...fields, ...(noteId ? { noteId } : {}) })
+        await uUpdateTask(editor.taskId!, { ...fields, ...(noteId ? { noteId } : {}) })
         task = await db.tasks.get(editor.taskId!)
       } else {
-        task = await addTask(editor.date, fields, { noteId: noteId || null, color: prefs.defaultNoteColor })
+        task = (await uAddTask(editor.date, fields, { noteId: noteId || null, color: prefs.defaultNoteColor })).task
       }
       if (task) await syncRecurrence(task)
       close()

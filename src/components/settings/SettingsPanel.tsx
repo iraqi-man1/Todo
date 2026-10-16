@@ -110,9 +110,19 @@ export function SettingsPanel() {
             checked={prefs.ambientSound}
             onCheckedChange={(ambientSound) => {
               update({ ambientSound })
-              if (ambientSound) startAmbient(prefs.volume, prefs.rainIntensity)
+              if (ambientSound) startAmbient(prefs.ambientVolume, prefs.rainIntensity)
             }}
             aria-label={d.settings.ambientSound}
+          />
+        </Row>
+        <Row label={d.settings.ambientVolume} stacked>
+          <Slider
+            value={[Math.round(prefs.ambientVolume * 100)]}
+            onValueChange={([v]) => update({ ambientVolume: v / 100 })}
+            max={100}
+            step={5}
+            disabled={!prefs.ambientSound}
+            thumbLabel={d.settings.ambientVolume}
           />
         </Row>
       </Section>
@@ -162,7 +172,7 @@ export function SettingsPanel() {
               onValueChange={([v]) => update({ volume: v / 100 })}
               max={100}
               step={5}
-              disabled={!prefs.sound && !prefs.ambientSound}
+              disabled={!prefs.sound}
               thumbLabel={d.settings.volume}
             />
             <Button variant="secondary" size="sm" disabled={!prefs.sound} onClick={() => playSound('chime')}>
@@ -222,6 +232,7 @@ function NameInput({ value, onSave }: { value: string; onSave: (v: string) => vo
 }
 
 function ColorPicker({ value, onChange, label }: { value: NoteColor; onChange: (c: NoteColor) => void; label: string }) {
+  const { d } = useI18n()
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2.5">
       {NOTE_COLORS.map((c) => (
@@ -230,7 +241,8 @@ function ColorPicker({ value, onChange, label }: { value: NoteColor; onChange: (
           type="button"
           role="radio"
           aria-checked={value === c}
-          aria-label={c}
+          aria-label={d.colors[c]}
+          title={d.colors[c]}
           onClick={() => onChange(c)}
           className={cn('grid size-11 place-items-center rounded-[6px] shadow-[0_1px_2px_rgb(60_40_20/0.15),0_3px_6px_-2px_rgb(60_40_20/0.2)] transition', value === c ? 'ring-2 ring-accent ring-offset-2 ring-offset-surface' : 'hover:-translate-y-0.5')}
           style={{ background: NOTE_HEX[c] }}

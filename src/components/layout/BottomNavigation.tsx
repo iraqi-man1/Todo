@@ -19,7 +19,8 @@ export function BottomNavigation() {
           const active = route.name === name
           return (
             <li key={name} className="flex-1">
-              <button
+              <motion.button
+                whileTap={{ scale: 0.92 }}
                 type="button"
                 data-nav={name}
                 onClick={() => navigate({ name })}
@@ -38,7 +39,7 @@ export function BottomNavigation() {
                 )}
                 <Icon className="relative size-[22px]" strokeWidth={active ? 2.2 : 1.8} />
                 <span className="relative">{d.nav[name]}</span>
-              </button>
+              </motion.button>
             </li>
           )
         })}

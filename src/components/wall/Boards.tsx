@@ -15,6 +15,8 @@ import { Paper } from '@/components/paper/StickyNote'
 import { DoneStamp } from '@/components/paper/DoneStamp'
 import { Pushpin } from '@/components/paper/Pushpin'
 import { noteRotation } from '@/domain/colors'
+import { useMemo } from 'react'
+import { SlotLayoutContext, type Offset, type Rect, type SlotLayout } from './drag'
 
 export interface BoardProps {
   anchor: DateKey
@@ -31,6 +33,7 @@ export interface BoardProps {
   onOpen: (date: DateKey, el: HTMLElement, rotate: number) => void
   onArrived: () => void
   onPickMonth?: (key: DateKey) => void
+  onMoveNote: (date: DateKey, offset: Offset | undefined) => void
 }
 
 function dimmedFor(status: SlotStatus, filter: WallFilter) {
@@ -54,10 +57,45 @@ function Slot(p: BoardProps & { date: DateKey; size: 'md' | 'lg' }) {
       dimmed={dimmedFor(status, p.filter)}
       hidden={p.inspecting === p.date}
       arrive={p.justPinned === p.date}
+      offset={p.archives.get(p.date)?.offset}
       onOpen={p.onOpen}
       onArrived={p.onArrived}
     />
   )
+}
+
+const hasPaper = (s: SlotStatus, total: number) => s === 'pinned' || s === 'ready' || s === 'unfinished' || (s === 'today' && total > 0)
+
+/**
+ * Geometry of a grid of date slots, so a dragged note can stay near its date and never overlap another.
+ * Coordinates are grid-relative and visual (mirrored for RTL).
+ */
+function useSlotLayout(p: BoardProps, cells: (DateKey | null)[], cols: number, cell: { w: number; h: number }, pitch: { x: number; y: number }): SlotLayout {
+  return useMemo(() => {
+    const index = new Map<DateKey, number>()
+    cells.forEach((k, i) => k && index.set(k, i))
+    const rtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl'
+    const home = (date: DateKey): Rect | undefined => {
+      const i = index.get(date)
+      if (i === undefined) return
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      return { x: (rtl ? cols - 1 - col : col) * pitch.x, y: row * pitch.y, w: cell.w, h: cell.h }
+    }
+    const obstacles = (date: DateKey) => {
+      const out: Rect[] = []
+      for (const [k] of index) {
+        if (k === date) continue
+        const s = p.summaries.get(k)
+        if (!hasPaper(slotStatus(k, s, p.today), s?.total ?? 0)) continue
+        const r = home(k)!
+        const o = p.archives.get(k)?.offset
+        out.push(o ? { ...r, x: r.x + o.x, y: r.y + o.y } : r)
+      }
+      return out
+    }
+    return { home, obstacles, limit: { x: Math.round(pitch.x * 0.45), y: Math.round(pitch.y * 0.45) }, onMove: p.onMoveNote }
+  }, [cells, cols, cell.w, cell.h, pitch.x, pitch.y, p.summaries, p.archives, p.today, p.onMoveNote])
 }
 
 function WeekdayHeader({ weekStartsOn, lang, cell, gap }: { weekStartsOn: WeekStart; lang: 'en' | 'ar'; cell: number; gap: number }) {
@@ -78,7 +116,9 @@ export function MonthBoard(p: BoardProps) {
   const stats = rangeStats(p.summaries, monthDays(p.anchor))
   const pinnedCount = monthDays(p.anchor).filter((k) => p.archives.has(k)).length
   const pad = p.narrow ? 28 : 56
+  const layout = useSlotLayout(p, cells, 7, { w: 140, h: 150 }, { x: 162, y: 172 })
   return (
+    <SlotLayoutContext.Provider value={layout}>
     <Board padding={pad}>
       <WoodenMonthPlaque
         title={date(p.anchor, 'monthYear')}
@@ -91,6 +131,7 @@ export function MonthBoard(p: BoardProps) {
       </div>
       {pinnedCount === 0 && <p className="chalk font-hand mt-8 text-center text-[26px]">{d.wall.emptyMonth}</p>}
     </Board>
+    </SlotLayoutContext.Provider>
   )
 }
 
@@ -99,14 +140,17 @@ export function WeekBoard(p: BoardProps) {
   const days = weekDays(p.anchor, p.weekStartsOn)
   const stats = rangeStats(p.summaries, days)
   const cols = p.narrow ? 2 : 7
+  const gap = p.narrow ? 28 : 30
+  const layout = useSlotLayout(p, days, cols, { w: 220, h: 240 }, { x: 220 + gap, y: 272 + gap })
   return (
+    <SlotLayoutContext.Provider value={layout}>
     <Board padding={p.narrow ? 28 : 56}>
       <WoodenMonthPlaque
         title={f(d.wall.week, { n: isoWeek(days[3]) })}
         subtitle={`${date(days[0], 'short')} – ${date(days[6], 'medium')} · ${f(d.wall.completedDays, { n: stats.completedDays })}`}
         className="mb-10"
       />
-      <div className="grid" style={{ gridTemplateColumns: `repeat(${cols}, 220px)`, gap: p.narrow ? 28 : 30 }}>
+      <div className="grid" style={{ gridTemplateColumns: `repeat(${cols}, 220px)`, gap }}>
         {days.map((k) => (
           <div key={k} className="flex flex-col items-center gap-3">
             <span className="engraved text-[13px] font-bold tracking-[0.2em] uppercase">{date(k, 'weekday')}</span>
@@ -115,6 +159,7 @@ export function WeekBoard(p: BoardProps) {
         ))}
       </div>
     </Board>
+    </SlotLayoutContext.Provider>
   )
 }
 

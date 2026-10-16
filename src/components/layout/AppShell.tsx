@@ -12,6 +12,7 @@ import { useMedia } from '@/hooks/useMedia'
 import { BottomNavigation } from './BottomNavigation'
 import { DesktopSidebar } from './DesktopSidebar'
 import { ShortcutsDialog } from './ShortcutsDialog'
+import { CommandPalette } from './CommandPalette'
 
 const WoodenWall = lazy(() => import('@/components/wall/WoodenWall').then((m) => ({ default: m.WoodenWall })))
 const CalendarView = lazy(() => import('@/components/calendar/CalendarView').then((m) => ({ default: m.CalendarView })))
@@ -76,6 +77,7 @@ export function AppShell() {
       <TaskEditor />
       <ArchivedNoteModal />
       <ShortcutsDialog />
+      <CommandPalette />
     </div>
   )
 }

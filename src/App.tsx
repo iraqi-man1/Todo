@@ -3,6 +3,7 @@ import { MotionConfig } from 'motion/react'
 import { Toaster } from 'sonner'
 import { AppShell } from '@/components/layout/AppShell'
 import { PwaPrompt } from '@/components/layout/PwaPrompt'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { loadPrefs } from '@/domain/actions'
 import { useAchievementWatcher } from '@/hooks/useAchievementWatcher'
 import { useMotionLevel } from '@/hooks/useMotionLevel'
@@ -84,6 +85,7 @@ export default function App() {
   if (!ready) return null
   return (
     <MotionConfig reducedMotion={level === 'full' ? 'never' : 'always'}>
+      <TooltipProvider delayDuration={450} skipDelayDuration={200}>
       <AppShell />
       <PwaPrompt />
       <Toaster
@@ -100,6 +102,7 @@ export default function App() {
           },
         }}
       />
+      </TooltipProvider>
     </MotionConfig>
   )
 }

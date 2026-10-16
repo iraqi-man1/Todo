@@ -48,6 +48,9 @@ interface UIState {
   wallAnchor: DateKey | null
   wallFilter: WallFilter
   setWall: (p: Partial<Pick<UIState, 'wallView' | 'wallAnchor' | 'wallFilter'>>) => void
+  /** Ask the wall to centre a date's note (e.g. "go to today"). `tick` makes repeats re-trigger. */
+  wallFocus: { date: DateKey; tick: number } | null
+  requestWallFocus: (date: DateKey) => void
 
   /** Date whose note was just pinned; the wall plays the attach animation for it once. */
   justPinned: DateKey | null
@@ -65,6 +68,10 @@ interface UIState {
   searchOpen: boolean
   setSearchOpen: (v: boolean) => void
   sidebarCollapsed: boolean
+  hideCompleted: boolean
+  setHideCompleted: (v: boolean) => void
+  paletteOpen: boolean
+  setPaletteOpen: (v: boolean) => void
   toggleSidebar: () => void
 }
 
@@ -79,10 +86,16 @@ export const useUI = create<UIState>((set) => ({
   },
   setRouteFromHash: () => set({ route: parseHash(window.location.hash) }),
 
-  wallView: 'month',
+  wallView: readChoice('dw-wall-view', ['day', 'week', 'month', 'year'] as const, 'month'),
   wallAnchor: null,
-  wallFilter: 'all',
-  setWall: (p) => set(p),
+  wallFilter: readChoice('dw-wall-filter', ['all', 'complete', 'incomplete'] as const, 'all'),
+  setWall: (p) => {
+    if (p.wallView) writeChoice('dw-wall-view', p.wallView)
+    if (p.wallFilter) writeChoice('dw-wall-filter', p.wallFilter)
+    set(p)
+  },
+  wallFocus: null,
+  requestWallFocus: (date) => set((s) => ({ wallFocus: { date, tick: (s.wallFocus?.tick ?? 0) + 1 } })),
 
   justPinned: null,
   setJustPinned: (justPinned) => set({ justPinned }),
@@ -99,6 +112,13 @@ export const useUI = create<UIState>((set) => ({
   searchOpen: false,
   setSearchOpen: (searchOpen) => set({ searchOpen }),
   sidebarCollapsed: readCollapsed(),
+  hideCompleted: readFlag('dw-hide-done'),
+  setHideCompleted: (hideCompleted) => {
+    writeFlag('dw-hide-done', hideCompleted)
+    set({ hideCompleted })
+  },
+  paletteOpen: false,
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   toggleSidebar: () =>
     set((s) => {
       try {
@@ -115,5 +135,36 @@ function readCollapsed(): boolean {
     return localStorage.getItem('dw-sidebar') === '1'
   } catch {
     return false
+  }
+}
+
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+function writeFlag(key: string, v: boolean) {
+  try {
+    localStorage.setItem(key, v ? '1' : '0')
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function readChoice<T extends string>(key: string, options: readonly T[], fallback: T): T {
+  try {
+    const v = localStorage.getItem(key) as T | null
+    return v && options.includes(v) ? v : fallback
+  } catch {
+    return fallback
+  }
+}
+function writeChoice(key: string, v: string) {
+  try {
+    localStorage.setItem(key, v)
+  } catch {
+    /* storage unavailable */
   }
 }

@@ -71,7 +71,7 @@ export function WallSearch({
             onChange={(e) => setQ(e.target.value)}
             placeholder={d.wall.searchPlaceholder}
             aria-label={d.wall.search}
-            className="h-12 w-full rounded-xl border border-line bg-surface-2 ps-11 pe-3 text-base focus:border-accent/60 focus:outline-none"
+            className="h-12 w-full rounded-xl border border-line bg-surface-2 ps-11 pe-3 text-base focus:border-accent/60 focus:outline-none focus-visible:outline-none"
           />
         </div>
         <div className="mt-3 min-h-40" aria-live="polite">

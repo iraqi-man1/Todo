@@ -41,6 +41,29 @@ export class DoneWallDB extends Dexie {
 
 export let db = new DoneWallDB()
 
+/** Fires after any committed write, so the UI can show a calm "saved" state. */
+type WriteListener = () => void
+const writeListeners = new Set<WriteListener>()
+export function onWrite(fn: WriteListener) {
+  writeListeners.add(fn)
+  return () => writeListeners.delete(fn)
+}
+function watchWrites(target: DoneWallDB) {
+  for (const table of target.tables) {
+    const notify = (trans: { on: (e: 'complete', fn: () => void) => void }) => trans.on('complete', () => writeListeners.forEach((f) => f()))
+    table.hook('creating', function (_k, _o, trans) {
+      notify(trans)
+    })
+    table.hook('updating', function (_m, _k, _o, trans) {
+      notify(trans)
+    })
+    table.hook('deleting', function (_k, _o, trans) {
+      notify(trans)
+    })
+  }
+}
+watchWrites(db)
+
 export type StorageStatus = 'persistent' | 'ok' | 'memory'
 let status: StorageStatus = 'ok'
 export const storageStatus = () => status
@@ -63,6 +86,7 @@ export async function initDb(): Promise<StorageStatus> {
     console.error('DoneWall: IndexedDB unavailable, using in-memory storage', err)
     const fake = await import('fake-indexeddb')
     db = new DoneWallDB('donewall-memory', { indexedDB: fake.indexedDB, IDBKeyRange: fake.IDBKeyRange })
+    watchWrites(db)
     await db.open()
     status = 'memory'
   }
@@ -74,5 +98,6 @@ export async function resetDbForTests(): Promise<void> {
   db.close()
   await Dexie.delete(db.name)
   db = new DoneWallDB(db.name)
+  watchWrites(db)
   await db.open()
 }

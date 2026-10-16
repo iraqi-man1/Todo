@@ -1,4 +1,5 @@
-import { ArrowRightToLine, CalendarDays, ChevronLeft, ChevronRight, NotebookPen, Pin, PinOff, Plus } from 'lucide-react'
+import { ArrowRightToLine, CalendarDays, ChevronLeft, ChevronRight, NotebookPen, Pin, PinOff, Plus, Search } from 'lucide-react'
+import { Tip } from '@/components/ui/tooltip'
 import { Board } from '@/components/wall/Board'
 import { FocusToggle } from '@/components/environment/FocusToggle'
 import { AnimatePresence, motion } from 'motion/react'
@@ -11,17 +12,13 @@ import { ConfirmDialog } from '@/components/ui/dialog'
 import { Input, Textarea } from '@/components/ui/fields'
 import {
   addNote,
-  archiveDay,
-  deleteNote,
-  deleteTask,
   materializeRecurrences,
   nextNoteColor,
   rescheduleUnfinished,
-  restoreTask,
   setDayMeta,
-  toggleTask,
-  unarchiveDay,
 } from '@/domain/actions'
+import { uDeleteNote, uDeleteTask, uPin, uToggleTask, uUnpin } from '@/domain/undoable'
+import { toastWithUndo } from '@/lib/undoUi'
 import { seededPick } from '@/domain/colors'
 import { summarizeTasks } from '@/domain/summary'
 import type { DateKey, DayNote, Task } from '@/domain/types'
@@ -54,6 +51,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
   const setWall = useUI((s) => s.setWall)
   const setJustPinned = useUI((s) => s.setJustPinned)
   const openEditor = useUI((s) => s.openEditor)
+  const setPaletteOpen = useUI((s) => s.setPaletteOpen)
   const noteRefs = useRef(new Map<string, PlannerNoteHandle>())
   const [dismissed, setDismissed] = useState<DateKey | null>(null)
   const [flying, setFlying] = useState(false)
@@ -76,7 +74,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
         playSound('tap')
         noteRefs.current.get(t.noteId)?.nudge()
       }
-      await toggleTask(t.id)
+      await uToggleTask(t.id)
     } catch (e) {
       reportError(e)
     }
@@ -84,18 +82,15 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
 
   const onDelete = async (t: Task) => {
     try {
-      const removed = await deleteTask(t.id)
-      if (removed)
-        toast(d.task.deleted, {
-          description: removed.title,
-          action: { label: d.task.undo, onClick: () => restoreTask(removed).catch(reportError) },
-        })
+      const entry = await uDeleteTask(t.id)
+      if (entry) toastWithUndo(d.task.deleted, entry, t.title)
     } catch (e) {
       reportError(e)
     }
   }
 
-  const onDeleteNote = (n: DayNote) => deleteNote(n.id).catch(reportError)
+  const onDeleteNote = (n: DayNote) =>
+    uDeleteNote(n.id).then((entry) => toastWithUndo(d.history.labels.noteDeleted, entry, n.title || undefined), reportError)
 
   const newNote = async () => {
     try {
@@ -118,7 +113,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
 
   const pin = async () => {
     try {
-      const res = await archiveDay(date)
+      const res = await uPin(date)
       if (!res.ok) return
       playSound('paper')
       setFlying(true)
@@ -183,17 +178,26 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
           <div className="flex shrink-0 items-center gap-1">
             <FocusToggle />
             <span data-dim className="flex items-center gap-1">
-            <Button variant="ghost" size="iconSm" onClick={() => go(-1)} aria-label={d.today.prevDay}>
-              <ChevronLeft className="rtl:rotate-180" />
-            </Button>
+            <Tip label={d.palette.open} shortcut="Ctrl K">
+              <Button variant="ghost" size="iconSm" className="md:hidden" onClick={() => setPaletteOpen(true)} aria-label={d.palette.open}>
+                <Search />
+              </Button>
+            </Tip>
+            <Tip label={d.today.prevDay}>
+              <Button variant="ghost" size="iconSm" onClick={() => go(-1)} aria-label={d.today.prevDay}>
+                <ChevronLeft className="rtl:rotate-180" />
+              </Button>
+            </Tip>
             {!isToday && (
               <Button variant="subtle" size="sm" onClick={() => navigate({ name: 'today' })}>
                 <CalendarDays /> {d.today.backToToday}
               </Button>
             )}
-            <Button variant="ghost" size="iconSm" onClick={() => go(1)} aria-label={d.today.nextDay}>
-              <ChevronRight className="rtl:rotate-180" />
-            </Button>
+            <Tip label={d.today.nextDay}>
+              <Button variant="ghost" size="iconSm" onClick={() => go(1)} aria-label={d.today.nextDay}>
+                <ChevronRight className="rtl:rotate-180" />
+              </Button>
+            </Tip>
             </span>
           </div>
         </div>
@@ -362,7 +366,7 @@ export function TodayBoard({ date: routeDate }: { date?: DateKey }) {
         title={d.today.unpinConfirmTitle}
         body={d.today.unpinConfirmBody}
         confirmLabel={d.today.unpin}
-        onConfirm={() => unarchiveDay(date).catch(reportError)}
+        onConfirm={() => uUnpin(date).then((entry) => toastWithUndo(d.history.labels.dayUnpinned, entry), reportError)}
       />
     </div>
   )

@@ -18,10 +18,10 @@ export function DailyProgress({ done, total, level }: { done: number; total: num
     return () => controls.stop()
   }, [pct, level, mv])
 
-  const label = total ? f(d.today.progress, { done, total, pct }) : d.today.noTasks
+  const label = total ? f(total === 1 ? d.today.progressOne : d.today.progress, { done, total, pct }) : d.today.noTasks
 
   return (
-    <div className="flex items-center gap-4" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-valuetext={label}>
+    <div className="flex items-center gap-4" role="progressbar" aria-label={d.today.title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-valuetext={label}>
       <div className="relative size-16 shrink-0">
         <svg viewBox="0 0 64 64" className="size-16 -rotate-90">
           <circle cx="32" cy="32" r={R} fill="none" stroke="var(--dw-line)" strokeWidth="6" />

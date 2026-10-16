@@ -9,8 +9,12 @@ function rng(seed: number) {
 }
 
 /** The view outside: night sky, moon, slow clouds, a far city and tree line. Pure SVG, drawn once. */
+const layer = (depth: number): React.CSSProperties => ({
+  transform: `translate(calc(var(--px, 0) * ${depth}px), calc(var(--py, 0) * ${depth * 0.6}px))`,
+})
+
 const NightScene = memo(function NightScene({ moonY = 120 }: { moonY?: number }) {
-  const { stars, buildings, lights } = useMemo(() => {
+  const { stars, buildings, lights, far } = useMemo(() => {
     const r = rng(42)
     const stars = Array.from({ length: 46 }, () => ({ x: r() * 400, y: r() * 300, s: 0.4 + r() * 0.9, tw: r() < 0.25, d: r() * 6 }))
     const buildings: { x: number; w: number; h: number }[] = []
@@ -19,14 +23,21 @@ const NightScene = memo(function NightScene({ moonY = 120 }: { moonY?: number })
       buildings.push({ x, w, h: 40 + r() * 110 * (r() < 0.15 ? 1.6 : 1) })
       x += w + r() * 3
     }
+    // A hazier, farther skyline for depth.
+    const far: { x: number; w: number; h: number }[] = []
+    for (let x = -10; x < 410; ) {
+      const w = 10 + r() * 18
+      far.push({ x, w, h: 70 + r() * 120 })
+      x += w + r() * 2
+    }
     const lights: { x: number; y: number; o: number }[] = []
     for (const b of buildings)
       for (let yy = 600 - b.h + 6; yy < 585; yy += 7)
         for (let xx = b.x + 3; xx < b.x + b.w - 3; xx += 5) if (r() < 0.13) lights.push({ x: xx, y: yy, o: 0.35 + r() * 0.6 })
-    return { stars, buildings, lights }
+    return { stars, buildings, lights, far }
   }, [])
   return (
-    <svg viewBox="0 0 400 600" preserveAspectRatio="xMidYMax slice" className="absolute inset-0 h-full w-full">
+    <svg viewBox="0 0 400 600" preserveAspectRatio="xMidYMax slice" className="absolute inset-0 h-full w-full scale-[1.06]">
       <defs>
         <linearGradient id="dw-sky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#0A111E" />
@@ -43,25 +54,43 @@ const NightScene = memo(function NightScene({ moonY = 120 }: { moonY?: number })
           <stop offset="0" stopColor="#3B4862" stopOpacity="0.55" />
           <stop offset="1" stopColor="#3B4862" stopOpacity="0" />
         </radialGradient>
+        <linearGradient id="dw-haze" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#24324B" stopOpacity="0" />
+          <stop offset="1" stopColor="#3A3E52" stopOpacity="0.55" />
+        </linearGradient>
         <linearGradient id="dw-cityglow" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#E8AD67" stopOpacity="0" />
           <stop offset="1" stopColor="#E8AD67" stopOpacity="0.16" />
         </linearGradient>
       </defs>
       <rect width="400" height="600" fill="url(#dw-sky)" />
-      {stars.map((s, i) => (
-        <circle key={i} cx={s.x} cy={s.y} r={s.s} fill="#F5E7CF" opacity={0.55} className={s.tw ? 'dw-twinkle' : undefined} style={s.tw ? { animationDelay: `${s.d}s` } : undefined} />
-      ))}
-      <circle cx="295" cy={moonY} r="90" fill="url(#dw-moonglow)" />
-      <circle cx="295" cy={moonY} r="19" fill="#EFE6D2" />
-      <circle cx="301" cy={moonY - 6} r="17" fill="#E3D9C2" opacity="0.5" />
-      <circle cx="288" cy={moonY + 6} r="3" fill="#D6CCB4" opacity="0.6" />
+      {/* Each layer drifts by its depth (parallax via --px/--py set by the window). */}
+      <g style={layer(2)}>
+        {stars.map((s, i) => (
+          <circle key={i} cx={s.x} cy={s.y} r={s.s} fill="#F5E7CF" opacity={0.55} className={s.tw ? 'dw-twinkle' : undefined} style={s.tw ? { animationDelay: `${s.d}s` } : undefined} />
+        ))}
+      </g>
+      <g style={layer(3)}>
+        <circle cx="295" cy={moonY} r="90" fill="url(#dw-moonglow)" />
+        <circle cx="295" cy={moonY} r="19" fill="#EFE6D2" />
+        <circle cx="301" cy={moonY - 6} r="17" fill="#E3D9C2" opacity="0.5" />
+        <circle cx="288" cy={moonY + 6} r="3" fill="#D6CCB4" opacity="0.6" />
+      </g>
+      <g style={layer(5)}>
       <g className="dw-clouds">
         <ellipse cx="120" cy="150" rx="150" ry="26" fill="url(#dw-cloud)" />
         <ellipse cx="330" cy="200" rx="120" ry="20" fill="url(#dw-cloud)" />
         <ellipse cx="220" cy="90" rx="110" ry="16" fill="url(#dw-cloud)" opacity="0.7" />
       </g>
+      </g>
       <rect y="420" width="400" height="180" fill="url(#dw-cityglow)" />
+      <g style={layer(6)} fill="#18233A">
+        {far.map((b, i) => (
+          <rect key={i} x={b.x} y={600 - b.h} width={b.w} height={b.h} />
+        ))}
+      </g>
+      <rect y="380" width="400" height="220" fill="url(#dw-haze)" />
+      <g style={layer(9)}>
       <g fill="#0E1626">
         {buildings.map((b, i) => (
           <rect key={i} x={b.x} y={600 - b.h} width={b.w} height={b.h} />
@@ -69,10 +98,21 @@ const NightScene = memo(function NightScene({ moonY = 120 }: { moonY?: number })
       </g>
       <g fill="#F2C27E">
         {lights.map((l, i) => (
-          <rect key={i} x={l.x} y={l.y} width="2" height="2.6" opacity={l.o} />
+          <rect
+            key={i}
+            x={l.x}
+            y={l.y}
+            width="2"
+            height="2.6"
+            opacity={l.o}
+            className={i % 23 === 7 ? 'dw-flicker' : undefined}
+            style={i % 23 === 7 ? { animationDelay: `${(i % 11) * 1.7}s` } : undefined}
+          />
         ))}
       </g>
+      </g>
       <path
+        style={layer(14)}
         d="M0 600 V560 q12 -22 26 -6 q10 -30 28 -8 q14 -18 26 4 q8 -10 18 2 V600 Z M300 600 V572 q14 -26 30 -8 q12 -24 30 -2 q16 -20 26 6 q8 -6 14 2 V600 Z"
         fill="#080D17"
       />
@@ -218,6 +258,8 @@ export function NightWindow({
   framed?: boolean
   className?: string
 }) {
+  const pane = useRef<HTMLDivElement>(null)
+  useParallax(pane, animate && framed)
   return (
     <div
       className={cn('relative overflow-hidden', framed && 'rounded-[6px] p-[14px]', className)}
@@ -232,7 +274,7 @@ export function NightWindow({
           : undefined
       }
     >
-      <div className={cn('relative h-full w-full overflow-hidden', framed && 'rounded-[2px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.5),inset_0_6px_14px_rgb(0_0_0/0.55)]')}>
+      <div ref={pane} className={cn('relative h-full w-full overflow-hidden', framed && 'rounded-[2px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.5),inset_0_6px_14px_rgb(0_0_0/0.55)]')}>
         <NightScene moonY={framed ? 120 : 330} />
         {rain && <RainCanvas intensity={intensity} animate={animate} />}
         {/* glass: faint reflection band + lamp reflected in the pane */}
@@ -259,4 +301,42 @@ const MULLION: React.CSSProperties = {
   backgroundImage: 'linear-gradient(rgb(40 24 12 / 0.45), rgb(40 24 12 / 0.45)), var(--wood-texture)',
   backgroundSize: '100% 100%, 600px 600px',
   boxShadow: '0 2px 6px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 220 170 / 0.15)',
+}
+
+/**
+ * A few pixels of depth as the pointer moves: far layers barely shift, near ones a little more.
+ * Eased toward the target each frame and idle when settled; off for touch, reduced motion and focus.
+ */
+function useParallax(ref: React.RefObject<HTMLDivElement | null>, enabled: boolean) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (!enabled || !window.matchMedia?.('(pointer: fine)').matches) {
+      el.style.setProperty('--px', '0')
+      el.style.setProperty('--py', '0')
+      return
+    }
+    let tx = 0
+    let ty = 0
+    let cx = 0
+    let cy = 0
+    let raf = 0
+    const tick = () => {
+      cx += (tx - cx) * 0.06
+      cy += (ty - cy) * 0.06
+      el.style.setProperty('--px', cx.toFixed(3))
+      el.style.setProperty('--py', cy.toFixed(3))
+      raf = Math.abs(tx - cx) + Math.abs(ty - cy) > 0.002 ? requestAnimationFrame(tick) : 0
+    }
+    const onMove = (e: PointerEvent) => {
+      tx = -((e.clientX / window.innerWidth) * 2 - 1)
+      ty = -((e.clientY / window.innerHeight) * 2 - 1)
+      if (!raf) raf = requestAnimationFrame(tick)
+    }
+    window.addEventListener('pointermove', onMove, { passive: true })
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      cancelAnimationFrame(raf)
+    }
+  }, [ref, enabled])
 }
